@@ -1,8 +1,5 @@
 # Power-of-2 Symmetric Quantization
 
-**Author: Yin Cao**
-**Date: August 8, 2025**
-
 Simple, plug-and-play PyTorch quantization with:
 - **Power-of-2 scale factors** (enables bit-shift operations)
 - **Multi-bitwidth configuration** (weights, inputs, outputs, biases)
