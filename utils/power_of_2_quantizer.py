@@ -110,25 +110,35 @@ class PowerOf2ScaleQuantizer:
 
     def quantize_tensor(self, tensor: torch.Tensor) -> torch.Tensor:
         """
-        Quantize tensor using power-of-2 scale.
-        
+        Quantize tensor using power-of-2 scale with straight-through estimator.
+
+        This implements fake quantization that allows gradients to flow through
+        for quantization-aware training.
+
         Args:
             tensor: Input tensor to quantize
-            
+
         Returns:
-            Quantized tensor
+            Quantized tensor with gradient flow preserved
         """
         scale, zero_point = self.compute_power_of_2_scale(tensor)
-        
+
         # Quantize: q = round(x / scale) + zero_point
-        quantized = torch.round(tensor / scale) + zero_point
-        
-        # Clamp to valid range
-        quantized = torch.clamp(quantized, self.quant_min, self.quant_max)
-        
+        quantized = tensor / scale + zero_point
+
+        # Apply straight-through estimator for round operation
+        # Forward: quantized values, Backward: straight-through gradients
+        quantized_round = quantized.round()
+        quantized = quantized + (quantized_round - quantized).detach()
+
+        # Apply straight-through estimator for clamp operation
+        # Forward: clamped values, Backward: straight-through gradients
+        quantized_clamped = quantized.clamp(self.quant_min, self.quant_max)
+        quantized = quantized + (quantized_clamped - quantized).detach()
+
         # Dequantize: x = (q - zero_point) * scale
         dequantized = (quantized - zero_point) * scale
-        
+
         return dequantized
     
     def get_scale_info(self, tensor: torch.Tensor) -> dict:

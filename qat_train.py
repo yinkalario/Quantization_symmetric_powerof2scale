@@ -42,7 +42,9 @@ class QuantizationAwareModule(nn.Module):
     """
     Wrapper module that applies quantization during forward pass.
 
-    This simulates quantization-aware training.
+    This simulates quantization-aware training using fake quantization.
+    Only input/output quantization is applied during forward pass.
+    Weight quantization is handled separately to avoid interfering with gradients.
     """
 
     def __init__(self, module: nn.Module, quantizer: MultiBitwidthPowerOf2Quantizer):
@@ -53,13 +55,13 @@ class QuantizationAwareModule(nn.Module):
         self.training_step = 0
 
     def forward(self, x):
-        """Forward pass with fake quantization."""
+        """Forward pass with fake quantization for inputs/outputs only."""
         # Quantize inputs (fake quantization - quantize then dequantize)
         if self.training:
             x_quantized, _ = self.quantizer.quantize_inputs(x)
             x = x_quantized
 
-        # Apply the actual module
+        # Apply the actual module (weights are already quantized from PTQ initialization)
         output = self.module(x)
 
         # Quantize outputs (fake quantization)
@@ -70,53 +72,49 @@ class QuantizationAwareModule(nn.Module):
         return output
 
 
-def apply_qat_to_model(model: nn.Module, quantizer: MultiBitwidthPowerOf2Quantizer) -> nn.Module:
+def apply_qat_to_model(model: nn.Module, quantizer: MultiBitwidthPowerOf2Quantizer, skip_weight_quantization: bool = False) -> nn.Module:
     """Convert model to QAT version with fake quantization."""
     print("Converting model to QAT with fake quantization...")
-    
-    # First, quantize weights and biases (like PTQ)
+
     quantization_details = {}
-    
-    for name, module in model.named_modules():
-        if hasattr(module, 'weight') and module.weight is not None:
-            # Quantize weights
-            original_weight = module.weight.data.clone()
-            quantized_weight, weight_info = quantizer.quantize_weights(original_weight)
-            module.weight.data = quantized_weight
-            quantization_details[f"{name}.weight"] = weight_info
-        
-        if hasattr(module, 'bias') and module.bias is not None:
-            # Quantize biases
-            original_bias = module.bias.data.clone()
-            quantized_bias, bias_info = quantizer.quantize_biases(original_bias)
-            module.bias.data = quantized_bias
-            quantization_details[f"{name}.bias"] = bias_info
-    
+
+    if not skip_weight_quantization:
+        # Only quantize weights if not already done by PTQ
+        print("Applying initial weight quantization...")
+        for name, module in model.named_modules():
+            if hasattr(module, 'weight') and module.weight is not None:
+                # Quantize weights
+                original_weight = module.weight.data.clone()
+                quantized_weight, weight_info = quantizer.quantize_weights(original_weight)
+                module.weight.data = quantized_weight
+                quantization_details[f"{name}.weight"] = weight_info
+
+            if hasattr(module, 'bias') and module.bias is not None:
+                # Quantize biases
+                original_bias = module.bias.data.clone()
+                quantized_bias, bias_info = quantizer.quantize_biases(original_bias)
+                module.bias.data = quantized_bias
+                quantization_details[f"{name}.bias"] = bias_info
+    else:
+        print("Skipping weight quantization (already done by PTQ)")
+
     # Wrap the model for input/output quantization during training
     qat_model = QuantizationAwareModule(model, quantizer)
-    
+
     return qat_model, quantization_details
 
 
 def update_quantization_constraints(model: nn.Module, quantizer: MultiBitwidthPowerOf2Quantizer):
-    """Update power-of-2 constraints during training."""
-    if hasattr(model, 'module'):  # Unwrap QAT wrapper
-        actual_model = model.module
-    else:
-        actual_model = model
-    
-    for name, module in actual_model.named_modules():
-        if hasattr(module, 'weight') and module.weight is not None:
-            # Recompute power-of-2 scale for updated weights
-            weight_tensor = module.weight.data
-            quantized_weight, _ = quantizer.quantize_weights(weight_tensor)
-            module.weight.data = quantized_weight
-        
-        if hasattr(module, 'bias') and module.bias is not None:
-            # Recompute power-of-2 scale for updated biases
-            bias_tensor = module.bias.data
-            quantized_bias, _ = quantizer.quantize_biases(bias_tensor)
-            module.bias.data = quantized_bias
+    """
+    Update power-of-2 constraints during training.
+
+    NOTE: This function was causing training issues by overwriting learned weights.
+    For proper QAT, we should only apply quantization in forward pass (fake quantization),
+    not overwrite the actual weights during training.
+    """
+    # DISABLED: This was preventing learning by overwriting gradients
+    # Instead, quantization should only happen in forward pass via QuantizationAwareModule
+    pass
 
 
 def train_epoch_with_quantization(model: nn.Module, train_loader, optimizer, criterion, 
@@ -139,8 +137,9 @@ def train_epoch_with_quantization(model: nn.Module, train_loader, optimizer, cri
         running_loss += loss.item()
         
         # Update power-of-2 constraints periodically
+        # NOTE: Function is now disabled to prevent overwriting learned weights
         if batch_idx % update_frequency == 0:
-            update_quantization_constraints(model, quantizer)
+            update_quantization_constraints(model, quantizer)  # Now harmless (does nothing)
             if batch_idx % (update_frequency * 2) == 0:
                 print(f'Epoch {epoch}, Batch {batch_idx}, Loss: {loss.item():.6f}')
     
@@ -250,9 +249,11 @@ def main():
     print("\n" + "="*60)
     print("STEP 2: Quantization Aware Training")
     print("="*60)
-    
+
     # Convert to QAT model
-    qat_model, initial_qat_details = apply_qat_to_model(model, quantizer)
+    # Skip weight quantization if PTQ was already applied
+    skip_weight_quant = config['qat'].get('run_ptq_first', True)
+    qat_model, initial_qat_details = apply_qat_to_model(model, quantizer, skip_weight_quantization=skip_weight_quant)
     
     # Create optimizer and scheduler for QAT
     optimizer = create_optimizer(qat_model, config)

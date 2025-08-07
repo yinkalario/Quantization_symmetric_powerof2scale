@@ -180,4 +180,14 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Ignore macOS system files
 .DS_Store
+
+# Ignore everything in the data folder
+/data/*
+
+# But keep the .gitkeep file in data
+!/data/.gitkeep
+
+# Ignore the outputs folder completely
+/outputs/
