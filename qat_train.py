@@ -64,10 +64,10 @@ class QuantizationAwareModule(nn.Module):
         # Apply the actual module (weights are already quantized from PTQ initialization)
         output = self.module(x)
 
-        # Quantize outputs (fake quantization)
-        if self.training:
-            output_quantized, _ = self.quantizer.quantize_outputs(output)
-            output = output_quantized
+        # # Quantize outputs (fake quantization)
+        # if self.training:
+        #     output_quantized, _ = self.quantizer.quantize_outputs(output)
+        #     output = output_quantized
 
         return output
 
