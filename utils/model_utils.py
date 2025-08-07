@@ -5,18 +5,20 @@ This module contains model definitions, data loading, and training utilities
 that are shared across different quantization scripts.
 
 Author: Yin Cao
+Date: August 8, 2025
 """
 
-from pathlib import Path
 import warnings
+import yaml
+from pathlib import Path
+from typing import Tuple, Dict, Any, Optional
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
-from typing import Tuple, Dict, Any, Optional
-import yaml
 
 # Suppress PyTorch deprecation warnings for NLLLoss2d
 warnings.filterwarnings("ignore", message=".*NLLLoss2d.*", category=FutureWarning)
@@ -24,7 +26,7 @@ warnings.filterwarnings("ignore", message=".*NLLLoss2d.*", category=FutureWarnin
 
 class SimpleCNN(nn.Module):
     """Simple CNN for CIFAR-10 classification."""
-    
+
     def __init__(self, num_classes: int = 10):
         super().__init__()
         self.features = nn.Sequential(
@@ -42,7 +44,7 @@ class SimpleCNN(nn.Module):
             nn.Flatten(),
             nn.Linear(64, num_classes)
         )
-    
+
     def forward(self, x):
         x = self.features(x)
         x = self.classifier(x)
@@ -51,21 +53,21 @@ class SimpleCNN(nn.Module):
 
 class ResNetBlock(nn.Module):
     """Basic ResNet block."""
-    
+
     def __init__(self, in_channels: int, out_channels: int, stride: int = 1):
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, 3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.conv2 = nn.Conv2d(out_channels, out_channels, 3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels)
-        
+
         self.shortcut = nn.Sequential()
         if stride != 1 or in_channels != out_channels:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, 1, stride=stride, bias=False),
                 nn.BatchNorm2d(out_channels)
             )
-    
+
     def forward(self, x):
         out = torch.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
@@ -76,26 +78,26 @@ class ResNetBlock(nn.Module):
 
 class SimpleResNet(nn.Module):
     """Simple ResNet for CIFAR-10."""
-    
+
     def __init__(self, num_classes: int = 10):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 16, 3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
-        
+
         self.layer1 = self._make_layer(16, 16, 2, stride=1)
         self.layer2 = self._make_layer(16, 32, 2, stride=2)
         self.layer3 = self._make_layer(32, 64, 2, stride=2)
-        
+
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(64, num_classes)
-    
+
     def _make_layer(self, in_channels: int, out_channels: int, num_blocks: int, stride: int):
         layers = []
         layers.append(ResNetBlock(in_channels, out_channels, stride))
         for _ in range(1, num_blocks):
             layers.append(ResNetBlock(out_channels, out_channels))
         return nn.Sequential(*layers)
-    
+
     def forward(self, x):
         x = torch.relu(self.bn1(self.conv1(x)))
         x = self.layer1(x)
@@ -108,14 +110,19 @@ class SimpleResNet(nn.Module):
 
 
 def load_config(config_path: str) -> Dict[str, Any]:
-    """Load configuration from YAML file."""
+    """Load configuration from JSON or YAML file."""
     config_path = Path(config_path)
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
-    
+
     with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
-    
+        if config_path.suffix.lower() == '.json':
+            import json
+            config = json.load(f)
+        else:
+            # Default to YAML for backward compatibility
+            config = yaml.safe_load(f)
+
     return config
 
 
@@ -124,28 +131,28 @@ def create_model(config: Dict[str, Any], device: torch.device) -> nn.Module:
     model_config = config['model']
     model_name = model_config['name']
     num_classes = model_config['num_classes']
-    
+
     if model_name == "SimpleCNN":
         model = SimpleCNN(num_classes=num_classes)
     elif model_name == "SimpleResNet":
         model = SimpleResNet(num_classes=num_classes)
     else:
         raise ValueError(f"Unknown model: {model_name}")
-    
+
     return model.to(device)
 
 
 def load_model(model_path: str, config: Dict[str, Any], device: torch.device) -> nn.Module:
     """Load model with optional pretrained weights."""
     model = create_model(config, device)
-    
+
     model_path = Path(model_path)
     if model_path.exists():
         model.load_state_dict(torch.load(model_path, map_location=device))
         print(f"Loaded model from {model_path}")
     else:
         print(f"Model path {model_path} not found, using random weights")
-    
+
     return model
 
 
@@ -197,28 +204,28 @@ def load_cifar10(data_path: str, batch_size: int, num_workers: int) -> Tuple[Dat
         transforms.ToTensor(),
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
-    
+
     # Test transforms without augmentation
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
-    
+
     # Training data
     train_dataset = datasets.CIFAR10(data_path, train=True, download=True, transform=transform_train)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    
+
     # Test data
     test_dataset = datasets.CIFAR10(data_path, train=False, download=True, transform=transform_test)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-    
+
     return train_loader, test_loader
 
 
 def create_criterion(config: Dict[str, Any]) -> nn.Module:
     """Create loss function based on configuration."""
     criterion_name = config['training']['criterion']
-    
+
     if criterion_name == "CrossEntropyLoss":
         return nn.CrossEntropyLoss()
     elif criterion_name == "MSELoss":
@@ -231,11 +238,11 @@ def create_optimizer(model: nn.Module, config: Dict[str, Any]) -> optim.Optimize
     """Create optimizer based on configuration."""
     training_config = config['training']
     optimizer_config = training_config['optimizer']
-    
+
     lr = training_config['learning_rate']
     weight_decay = training_config.get('weight_decay', 0)
     optimizer_type = optimizer_config['type']
-    
+
     if optimizer_type == "Adam":
         return optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     elif optimizer_type == "SGD":
@@ -251,12 +258,12 @@ def create_scheduler(optimizer: optim.Optimizer, config: Dict[str, Any]) -> Opti
     """Create learning rate scheduler based on configuration."""
     training_config = config['training']
     scheduler_config = training_config.get('scheduler')
-    
+
     if not scheduler_config:
         return None
-    
+
     scheduler_type = scheduler_config['type']
-    
+
     if scheduler_type == "StepLR":
         step_size = scheduler_config.get('step_size', 3)
         gamma = scheduler_config.get('gamma', 0.1)
@@ -272,23 +279,23 @@ def create_scheduler(optimizer: optim.Optimizer, config: Dict[str, Any]) -> Opti
         raise ValueError(f"Unknown scheduler: {scheduler_type}")
 
 
-def evaluate_model(model: nn.Module, data_loader: DataLoader, device: torch.device, 
+def evaluate_model(model: nn.Module, data_loader: DataLoader, device: torch.device,
                   max_batches: Optional[int] = None) -> float:
     """Evaluate model accuracy."""
     model.eval()
     correct = 0
     total = 0
-    
+
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(data_loader):
             if max_batches and batch_idx >= max_batches:
                 break
-                
+
             data, target = data.to(device), target.to(device)
             output = model(data)
             pred = output.argmax(dim=1)
             correct += pred.eq(target).sum().item()
             total += target.size(0)
-    
+
     accuracy = 100.0 * correct / total
     return accuracy

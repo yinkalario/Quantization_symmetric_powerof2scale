@@ -53,24 +53,24 @@ class AIMETPowerOf2QATManager:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.quantizer = MultiBitwidthPowerOf2Quantizer(config)
-        
+
     def apply_power_of_2_constraints(self, quantsim: QuantizationSimModel):
         """Apply power-of-2 constraints to AIMET quantizers during training."""
         print("Applying power-of-2 constraints to AIMET QAT quantizers...")
-        
+
         constraint_info = {}
-        
+
         for name, module in quantsim.model.named_modules():
             if isinstance(module, QcQuantizeWrapper):
                 # Get the wrapped module (Conv2d, Linear, etc.)
                 wrapped_module = module._module_to_wrap
-                
+
                 if hasattr(wrapped_module, 'weight'):
                     # Compute power-of-2 scale for weights
                     weight_tensor = wrapped_module.weight.data
                     _, weight_info = self.quantizer.quantize_weights(weight_tensor)
                     scale, zero_point, exponent = weight_info['scale'], weight_info['zero_point'], weight_info['exponent']
-                    
+
                     # Apply power-of-2 constraint to AIMET quantizer
                     if hasattr(module, 'param_quantizers') and 'weight' in module.param_quantizers:
                         weight_quantizer = module.param_quantizers['weight']
@@ -78,7 +78,7 @@ class AIMETPowerOf2QATManager:
                             # Force the scale to be power-of-2
                             weight_quantizer.encoding.scale = float(scale)
                             weight_quantizer.encoding.offset = int(zero_point)
-                            
+
                             constraint_info[name] = {
                                 'scale': float(scale),
                                 'zero_point': int(zero_point),
@@ -86,23 +86,23 @@ class AIMETPowerOf2QATManager:
                                 'power_of_2': f"2^(-{exponent})",
                                 'hardware_op': f"x >> {exponent}" if exponent > 0 else f"x << {-exponent}" if exponent < 0 else "x"
                             }
-                            
+
                             print(f"  {name}: scale={scale:.6f} = 2^(-{exponent}), hardware: {constraint_info[name]['hardware_op']}")
-        
+
         return constraint_info
-    
+
     def update_power_of_2_constraints_during_training(self, quantsim: QuantizationSimModel):
         """Update power-of-2 constraints periodically during training."""
         for name, module in quantsim.model.named_modules():
             if isinstance(module, QcQuantizeWrapper):
                 wrapped_module = module._module_to_wrap
-                
+
                 if hasattr(wrapped_module, 'weight'):
                     # Recompute power-of-2 scale for updated weights
                     weight_tensor = wrapped_module.weight.data
                     _, weight_info = self.quantizer.quantize_weights(weight_tensor)
                     scale, zero_point = weight_info['scale'], weight_info['zero_point']
-                    
+
                     # Update AIMET quantizer with new power-of-2 scale
                     if hasattr(module, 'param_quantizers') and 'weight' in module.param_quantizers:
                         weight_quantizer = module.param_quantizers['weight']
@@ -119,20 +119,20 @@ def load_data_aimet(data_path: str, batch_size: int = 128) -> Tuple[DataLoader, 
         transforms.ToTensor(),
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
-    
+
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
-    
+
     # Training data
     train_dataset = datasets.CIFAR10(data_path, train=True, download=True, transform=transform_train)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
-    
+
     # Test data
     test_dataset = datasets.CIFAR10(data_path, train=False, download=True, transform=transform_test)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
-    
+
     return train_loader, test_loader
 
 
@@ -182,7 +182,7 @@ def main():
         print("  ./scripts/create_env.sh")
         print("  conda activate aimet_quantization")
         return
-    
+
     parser = argparse.ArgumentParser(description='AIMET + Power-of-2 Symmetric QAT')
     parser.add_argument('--config', type=str, default='configs/quantization_config.yaml',
                        help='Path to configuration file')
@@ -202,26 +202,26 @@ def main():
     # Load configuration
     print(f"Loading configuration from {args.config}...")
     config = load_config(args.config)
-    
+
     # Setup device
     if args.device == 'auto':
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
         device = torch.device(args.device)
     print(f"Using device: {device}")
-    
+
     # Create output directory
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Load model
     print(f"Loading model...")
     model = load_model(args.model_path, device)
-    
+
     # Load data
     print(f"Loading data from {args.data_path}...")
     train_loader, test_loader = load_data(config, args.data_path)
-    
+
     # Step 1: PTQ Initialization (recommended best practice)
     if config['qat'].get('run_ptq_first', True):
         print("\n" + "="*60)
@@ -330,7 +330,7 @@ def main():
     criterion = create_criterion(config)
     optimizer = create_optimizer(quantsim.model, config)
     scheduler = create_scheduler(optimizer, config)
-    
+
     # Training parameters
     epochs = args.epochs or config['training']['epochs']
     update_frequency = config['qat'].get('constraint_update_frequency', 100)
@@ -361,7 +361,7 @@ def main():
             best_accuracy = accuracy
             best_model_path = output_dir / 'best_aimet_power_of_2_qat_model.pth'
             torch.save(quantsim.model.state_dict(), best_model_path)
-    
+
     # Extract final quantization details
     final_constraint_info = qat_manager.apply_power_of_2_constraints(quantsim)
 

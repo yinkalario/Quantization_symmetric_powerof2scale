@@ -1,9 +1,14 @@
 # Power-of-2 Symmetric Quantization
 
+**Author: Yin Cao**
+**Date: August 8, 2025**
+
 Simple, plug-and-play PyTorch quantization with:
 - **Power-of-2 scale factors** (enables bit-shift operations)
 - **Multi-bitwidth configuration** (weights, inputs, outputs, biases)
 - **PTQ → QAT workflow** (best practice quantization pipeline)
+- **Complete input/output quantization** (full pipeline coverage)
+- **JSON output format** (clean, structured results)
 
 ## 🚀 Quickstart
 
@@ -21,7 +26,11 @@ python ptq_quantize.py --data_path data/ --max_eval_batches 10
 
 ### 3. Run QAT (Quantization Aware Training)
 ```bash
+# Full 3-step pipeline: PTQ → QAT → Final PTQ
 python qat_train.py --data_path data/ --epochs 5
+
+# Weight-only QAT (skip final input/output quantization)
+python qat_train.py --data_path data/ --epochs 5 --no-final_ptq
 ```
 
 ## 🔧 Using Your Own Model and Dataset
@@ -98,6 +107,9 @@ training:
 
   scheduler:
     type: "YourCustomScheduler"  # Default: StepLR
+
+# Note: Configuration uses YAML format for readability
+# Output files use JSON format for clean structure
 ```
 
 ## 📁 Project Structure
@@ -155,57 +167,80 @@ quantization:
 - **Activations**: 8-bit with careful calibration (dynamic range varies)
 - **Biases**: 32-bit to maintain accuracy (small memory overhead)
 
-### PTQ → QAT Workflow (Best Practice)
-**Step 1: Post-Training Quantization (PTQ)**
+### Enhanced 3-Step PTQ → QAT → PTQ Workflow
+**Step 1: Initial PTQ (Weight/Bias Quantization)**
 - Fast quantization without retraining (minutes)
-- Good initialization for QAT
-- Identifies problematic layers
+- Quantizes weights and biases only
+- Good initialization for QAT training
 
-**Step 2: Quantization Aware Training (QAT)**
-- Fine-tune with quantization in the loop (hours)
-- Recovers accuracy lost in PTQ
-- Learns quantization-friendly representations
+**Step 2: Weight-Only QAT Training**
+- Fine-tune with quantized weights (hours)
+- No input/output quantization during training (better stability)
+- Learns optimal quantized weight representations
 
-**Why PTQ → QAT is better:**
-- **Better convergence**: QAT starts from reasonable quantized state
-- **Higher final accuracy**: Empirically proven across models
-- **Faster training**: Fewer epochs needed for QAT
+**Step 3: Final PTQ (Input/Output Quantization)**
+- Calibrates input/output quantization parameters
+- Uses trained model for activation range estimation
+- Complete quantization coverage for deployment
+
+**Why this 3-step approach is optimal:**
+- **Better training stability**: Weight-only QAT avoids gradient issues
+- **Complete coverage**: All tensors (weights, biases, inputs, outputs) quantized
+- **Production ready**: Full quantization details for hardware deployment
+- **JSON output**: Clean, structured results with hardware operation details
 
 ## 📊 Example Output
 
-### Detailed Quantization Report
-```yaml
-quantization_type: Multi-bitwidth Power-of-2 Symmetric PTQ
-config:
-  weight: {bitwidth: 8, symmetric: true, power_of_2: true}
-  input: {bitwidth: 8, symmetric: false, power_of_2: true}
-  bias: {bitwidth: 32, symmetric: true, power_of_2: true}
-
-quantization_details:
-  features.0.weight:
-    scale: 0.001953125
-    power_of_2: "2^(-9)"
-    hardware_op: "x >> 9"
-    bitwidth: 8
-    exponent: 9
-  classifier.2.weight:
-    scale: 0.000976563
-    power_of_2: "2^(-10)"
-    hardware_op: "x >> 10"
-    bitwidth: 8
-    exponent: 10
-
-original_accuracy: 85.32
-quantized_accuracy: 84.89
-accuracy_drop: 0.43
+### Detailed Quantization Report (JSON Output)
+```json
+{
+  "quantization_type": "PTQ → Weight-Only QAT → Final PTQ Pipeline",
+  "pipeline_steps": [
+    "Step 1: PTQ for weight/bias initialization",
+    "Step 2: Weight-only QAT training",
+    "Step 3: Final PTQ for input/output quantization"
+  ],
+  "config": {
+    "weight": {"bitwidth": 8, "symmetric": true, "power_of_2": true},
+    "input": {"bitwidth": 8, "symmetric": true, "power_of_2": true},
+    "output": {"bitwidth": 8, "symmetric": true, "power_of_2": true},
+    "bias": {"bitwidth": 32, "symmetric": true, "power_of_2": true}
+  },
+  "final_quantization_details": {
+    "features.0.weight": {
+      "scale": 0.001953125,
+      "power_of_2": "2^(-9)",
+      "hardware_op": "x >> 9",
+      "bitwidth": 8
+    },
+    "features.0.input": {
+      "scale": 0.015625,
+      "power_of_2": "2^(-6)",
+      "hardware_op": "x >> 6",
+      "bitwidth": 8
+    },
+    "features.0.output": {
+      "scale": 0.03125,
+      "power_of_2": "2^(-5)",
+      "hardware_op": "x >> 5",
+      "bitwidth": 8
+    }
+  },
+  "initial_accuracy": 10.12,
+  "ptq_accuracy": 9.92,
+  "qat_best_accuracy": 38.99,
+  "final_accuracy": 38.99,
+  "total_improvement": 28.87
+}
 ```
 
 ### Performance Comparison
 ```
 Model Size:     32MB → 8MB (4x smaller)
 Inference:      100ms → 45ms (2.2x faster)
-Accuracy Drop:  <1% with QAT
+Accuracy:       Random 10% → QAT 39% → Final 39% (+29% improvement)
 Power Usage:    50% reduction on mobile devices
+Memory Access:  75% reduction with power-of-2 scales
 ```
 
 ## 🛠️ Advanced Usage

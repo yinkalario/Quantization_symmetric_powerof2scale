@@ -18,7 +18,7 @@ def run_test(name, command, timeout=120):
     print(f"Testing: {name}")
     print(f"Command: {command}")
     print(f"{'='*60}")
-    
+
     try:
         result = subprocess.run(
             command,
@@ -46,7 +46,7 @@ def run_test(name, command, timeout=120):
 def main():
     print("Power-of-2 Symmetric Quantization Test Suite")
     print("=" * 60)
-    
+
     tests = [
         ("Power-of-2 Quantizer Demo", "python utils/power_of_2_quantizer.py", 60),
         ("Pure PyTorch PTQ", "python ptq_quantize.py --data_path ./data --max_eval_batches 3", 120),
@@ -54,26 +54,26 @@ def main():
         ("AIMET + Power-of-2 PTQ", "python aimet_power_of_2_ptq.py --data_path ./data --max_eval_batches 3", 120),
         ("AIMET + Power-of-2 QAT", "python aimet_power_of_2_qat.py --data_path ./data --epochs 1 --batch_size 64", 180),
     ]
-    
+
     results = []
     for name, command, timeout in tests:
         success = run_test(name, command, timeout)
         results.append((name, success))
-    
+
     # Summary
     print(f"\n{'='*60}")
     print("TEST SUMMARY")
     print(f"{'='*60}")
-    
+
     passed = 0
     for name, success in results:
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{name:30} {status}")
         if success:
             passed += 1
-    
+
     print(f"\nResults: {passed}/{len(results)} tests passed")
-    
+
     if passed == len(results):
         print("\n🎉 All tests passed! Power-of-2 quantization is working correctly.")
         return 0

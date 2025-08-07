@@ -11,13 +11,13 @@ quantization:
   # Input/Activation quantization settings  
   input:
     bitwidth: 8
-    symmetric: false  # Activations are typically asymmetric
+    symmetric: true  # Activations are typically asymmetric
     power_of_2: true
     
   # Output quantization settings
   output:
     bitwidth: 8
-    symmetric: false  # Outputs are typically asymmetric
+    symmetric: true  # Outputs are typically asymmetric
     power_of_2: true
     
   # Bias quantization settings
