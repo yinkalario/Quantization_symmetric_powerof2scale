@@ -7,7 +7,7 @@
 
 set -e  # Exit on any error
 
-ENV_NAME="aimet_quantization"
+ENV_NAME="QuantizationPo2"
 PYTHON_VERSION="3.9"
 
 echo "=== Power-of-2 Symmetric Quantization Environment Setup ==="
