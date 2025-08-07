@@ -1,0 +1,89 @@
+# AIMET + Power-of-2 Quantization Configuration
+# This file defines quantization settings for different tensor types
+
+quantization:
+  # Weight quantization settings
+  weight:
+    bitwidth: 8
+    symmetric: true
+    power_of_2: true
+    
+  # Input/Activation quantization settings  
+  input:
+    bitwidth: 8
+    symmetric: false  # Activations are typically asymmetric
+    power_of_2: true
+    
+  # Output quantization settings
+  output:
+    bitwidth: 8
+    symmetric: false  # Outputs are typically asymmetric
+    power_of_2: true
+    
+  # Bias quantization settings
+  bias:
+    bitwidth: 32  # Bias typically uses higher precision
+    symmetric: true
+    power_of_2: true
+
+# Model configuration
+model:
+  name: "SimpleCNN"
+  num_classes: 10
+  input_shape: [3, 32, 32]
+
+# Data configuration
+data:
+  dataset: "CIFAR10"
+  batch_size: 128
+  num_workers: 2
+  
+# Training configuration
+training:
+  epochs: 10
+  learning_rate: 0.001
+  weight_decay: 0.01  # AdamW typically uses higher weight decay than Adam
+  
+  # Optimizer settings
+  optimizer:
+    type: "AdamW"  # AdamW (default), Adam, SGD
+    # Note: momentum is only used for SGD, not AdamW/Adam
+    
+  # Scheduler settings
+  scheduler:
+    type: "StepLR"  # StepLR, CosineAnnealingLR, ReduceLROnPlateau
+    step_size: 3
+    gamma: 0.1
+    
+  # Loss function
+  criterion: "CrossEntropyLoss"
+
+# QAT specific settings
+qat:
+  # Whether to run PTQ before QAT (recommended)
+  run_ptq_first: true
+  
+  # Number of calibration batches for initial PTQ
+  calibration_batches: 10
+  
+  # How often to update power-of-2 constraints during training
+  constraint_update_frequency: 100  # Every N batches
+
+# PTQ specific settings  
+ptq:
+  # Number of calibration batches
+  calibration_batches: 50
+  
+  # Maximum evaluation batches (for quick testing)
+  max_eval_batches: null  # null means use all data
+
+# Output settings
+output:
+  # Directory for saving results
+  base_dir: "outputs"
+  
+  # Whether to save detailed quantization info
+  save_quantization_details: true
+  
+  # Whether to export ONNX model (if supported)
+  export_onnx: false
