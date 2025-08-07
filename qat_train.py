@@ -57,9 +57,9 @@ class QuantizationAwareModule(nn.Module):
     def forward(self, x):
         """Forward pass with fake quantization for inputs/outputs only."""
         # Quantize inputs (fake quantization - quantize then dequantize)
-        if self.training:
-            x_quantized, _ = self.quantizer.quantize_inputs(x)
-            x = x_quantized
+        # if self.training:
+        #     x_quantized, _ = self.quantizer.quantize_inputs(x)
+        #     x = x_quantized
 
         # Apply the actual module (weights are already quantized from PTQ initialization)
         output = self.module(x)
