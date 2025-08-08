@@ -142,14 +142,22 @@ training:
 ## Project Structure
 
 ```
-├── ptq_quantize.py              # Multi-bitwidth PTQ (Recommended)
-├── qat_train.py                 # Multi-bitwidth QAT with PTQ init (Recommended)
-├── aimet_power_of_2_ptq.py      # AIMET + Power-of-2 PTQ (Professional)
-├── aimet_power_of_2_qat.py      # AIMET + Power-of-2 QAT (Professional)
+├── ptq_quantize.py              # Wrapper: Multi-bitwidth PTQ (Recommended)
+├── qat_train.py                 # Wrapper: Multi-bitwidth QAT with PTQ init (Recommended)
+├── aimet_power_of_2_ptq.py      # Wrapper: AIMET + Power-of-2 PTQ (Professional)
+├── aimet_power_of_2_qat.py      # Wrapper: AIMET + Power-of-2 QAT (Professional)
+├── test_quantization.py         # Wrapper: Test script
+├── src/                         # Source code directory
+│   ├── __init__.py              # Package initialization
+│   ├── ptq_quantize.py          # Core PTQ implementation
+│   ├── qat_train.py             # Core QAT implementation
+│   ├── aimet_power_of_2_ptq.py  # Core AIMET PTQ implementation
+│   ├── aimet_power_of_2_qat.py  # Core AIMET QAT implementation
+│   ├── test_quantization.py     # Core test implementation
+│   └── utils/                   # Utility modules
+│       ├── power_of_2_quantizer.py # Core quantization implementation
+│       └── model_utils.py       # Shared model/data utilities
 ├── configs/quantization_config.yaml # Quantization configuration
-├── utils/power_of_2_quantizer.py # Core quantization implementation
-├── utils/model_utils.py         # Shared model/data utilities
-├── test_quantization.py         # Test script
 ├── scripts/create_env.sh         # Environment setup script
 ├── requirements.txt             # Dependencies
 └── README.md                    # This file
