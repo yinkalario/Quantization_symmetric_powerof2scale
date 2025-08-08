@@ -21,7 +21,7 @@ qat-full: ## Run full QAT training (10 epochs)
 	python src/qat_train.py --data_path data/ --epochs 10
 
 qat-aimet: ## Run AIMET + Power-of-2 QAT example (2 epochs)
-	python src/aimet_power_of_2_qat.py --data_path data/ --epochs 2 --batch_size 128
+	python src/aimet_power_of_2_qat.py --data_path data/ --epochs 2
 
 demo: ## Run power-of-2 quantizer demonstration
 	python src/utils/power_of_2_quantizer.py
