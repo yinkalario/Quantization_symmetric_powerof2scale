@@ -416,9 +416,6 @@ def main():
         forward_pass_callback_args=None
     )
 
-    # Apply initial power-of-2 constraints
-    _ = qat_manager.apply_power_of_2_constraints(quantsim, original_model)
-
     # Setup training using config (like normal QAT)
     criterion = create_criterion(config)
     optimizer = create_optimizer(quantsim.model, config)
@@ -455,6 +452,9 @@ def main():
             best_model_path = output_dir / 'best_aimet_power_of_2_qat_model.pth'
             torch.save(quantsim.model.state_dict(), best_model_path)
 
+    # Evaluate final AIMET model (for comparison)
+    print(f"\nFinal AIMET QAT model accuracy: {best_accuracy:.2f}%")
+
     # Extract final quantization details from trained QAT model
     print("\n" + "=" * 60)
     print("ANALYZING TRAINED QAT MODEL")
@@ -466,6 +466,47 @@ def main():
     # Apply power-of-2 analysis to the TRAINED model weights
     print("Power-of-2 analysis of TRAINED QAT model weights:")
     final_constraint_info = qat_manager.apply_power_of_2_constraints(quantsim, trained_model)
+
+    # Create and evaluate power-of-2 constrained model
+    print("\n" + "=" * 60)
+    print("CREATING POWER-OF-2 CONSTRAINED MODEL")
+    print("=" * 60)
+
+    # Create a copy of the trained model for power-of-2 quantization
+    power_of_2_model = copy.deepcopy(trained_model)
+
+    # Apply power-of-2 quantization to the model weights
+    print("Applying power-of-2 constraints to model weights...")
+    for name, module in power_of_2_model.named_modules():
+        if hasattr(module, 'weight') and module.weight is not None:
+            if f"{name}.weight" in final_constraint_info:
+                # Get power-of-2 quantized weights
+                weight_tensor = module.weight.data
+                quantized_weights, _ = qat_manager.quantizer.quantize_weights(weight_tensor)
+                # Replace with power-of-2 quantized weights
+                module.weight.data = quantized_weights
+                print(f"  ✅ Applied power-of-2 quantization to {name}")
+
+    # Evaluate power-of-2 constrained model
+    print("\nEvaluating power-of-2 constrained model...")
+    power_of_2_accuracy = evaluate_model(power_of_2_model, test_loader, device)
+    print(f"Power-of-2 constrained model accuracy: {power_of_2_accuracy:.2f}%")
+
+    # Calculate meaningful improvements
+    aimet_improvement = best_accuracy - initial_accuracy
+    power_of_2_improvement = power_of_2_accuracy - initial_accuracy
+    accuracy_drop_from_power_of_2 = best_accuracy - power_of_2_accuracy
+
+    print("\n" + "=" * 60)
+    print("ACCURACY COMPARISON")
+    print("=" * 60)
+    print(f"Original model accuracy:           {initial_accuracy:.2f}%")
+    print(f"AIMET QAT model accuracy:          {best_accuracy:.2f}%")
+    print(f"Power-of-2 constrained accuracy:   {power_of_2_accuracy:.2f}%")
+    print(f"")
+    print(f"AIMET improvement over original:    {aimet_improvement:+.2f}%")
+    print(f"Power-of-2 improvement over original: {power_of_2_improvement:+.2f}%")
+    print(f"Accuracy drop from power-of-2:     {accuracy_drop_from_power_of_2:+.2f}%")
 
     # Also analyze original model for comparison
     print("\nPower-of-2 analysis of ORIGINAL model weights (for comparison):")
@@ -522,8 +563,11 @@ def main():
         'learning_rate': config['training']['learning_rate'],
         'initial_accuracy': float(initial_accuracy),
         'ptq_accuracy': float(ptq_accuracy) if config['qat'].get('run_ptq_first', True) else None,
-        'final_accuracy': float(best_accuracy),
-        'total_improvement': float(best_accuracy - initial_accuracy),
+        'aimet_qat_accuracy': float(best_accuracy),
+        'power_of_2_accuracy': float(power_of_2_accuracy),
+        'aimet_improvement': float(aimet_improvement),
+        'power_of_2_improvement': float(power_of_2_improvement),
+        'accuracy_drop_from_power_of_2': float(accuracy_drop_from_power_of_2),
         'ptq_quantization_details': (ptq_constraint_info
                                      if config['qat'].get('run_ptq_first', True)
                                      else None),
