@@ -239,10 +239,10 @@ def main():
 
         print(f"Epoch {epoch + 1}/{epochs}: Loss={avg_loss:.4f}, Accuracy={accuracy:.2f}%")
 
-        # Save best model
+        # Save best weight-only QAT model (before input/output quantization)
         if accuracy > best_accuracy:
             best_accuracy = accuracy
-            best_model_path = output_dir / 'best_qat_model.pth'
+            best_model_path = output_dir / 'best_weight_only_qat_model.pth'
             if hasattr(qat_model, 'module'):
                 torch.save(qat_model.module.state_dict(), best_model_path)
             else:
@@ -279,10 +279,10 @@ def main():
         final_accuracy = evaluate_model(final_model, test_loader, device)
         print(f"Final model accuracy (full quantization): {final_accuracy:.2f}%")
 
-        # Save final model
-        final_model_path = output_dir / 'final_quantized_model.pth'
+        # Save final fully quantized model (complete power-of-2 quantization)
+        final_model_path = output_dir / 'final_fully_quantized_power_of_2_model.pth'
         torch.save(final_model.state_dict(), final_model_path)
-        print(f"Final quantized model saved to {final_model_path}")
+        print(f"Final fully quantized model saved to {final_model_path}")
 
         results_model = final_model
         final_accuracy_result = final_accuracy

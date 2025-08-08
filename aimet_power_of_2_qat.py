@@ -446,10 +446,10 @@ def main():
 
         print(f"Epoch {epoch + 1}/{epochs}: Loss={avg_loss:.4f}, Accuracy={accuracy:.2f}%")
 
-        # Save best model
+        # Save best AIMET QAT model (trained with optimal scales)
         if accuracy > best_accuracy:
             best_accuracy = accuracy
-            best_model_path = output_dir / 'best_aimet_power_of_2_qat_model.pth'
+            best_model_path = output_dir / 'best_aimet_qat_optimal_scales_model.pth'
             torch.save(quantsim.model.state_dict(), best_model_path)
 
     # Evaluate final AIMET model (for comparison)
@@ -508,6 +508,11 @@ def main():
     print("\nEvaluating power-of-2 constrained model...")
     power_of_2_accuracy = evaluate_model(power_of_2_model, test_loader, device)
     print(f"Power-of-2 constrained model accuracy: {power_of_2_accuracy:.2f}%")
+
+    # Save power-of-2 constrained model (for hardware deployment)
+    power_of_2_model_path = output_dir / 'power_of_2_constrained_model.pth'
+    torch.save(power_of_2_model.state_dict(), power_of_2_model_path)
+    print(f"✅ Saved power-of-2 constrained model to: {power_of_2_model_path}")
 
     # Calculate meaningful improvements
     aimet_improvement = best_accuracy - initial_accuracy
@@ -619,16 +624,16 @@ def main():
     print("\nSaving quantized model and encodings...")
 
     try:
-        # Save PyTorch model
-        model_save_path = output_dir / 'aimet_power_of_2_qat_final.pth'
+        # Save final AIMET QAT model (trained with optimal scales)
+        model_save_path = output_dir / 'final_aimet_qat_optimal_scales_model.pth'
         torch.save(quantsim.model.state_dict(), model_save_path)
-        print(f"✅ Saved PyTorch model to: {model_save_path}")
+        print(f"✅ Saved final AIMET QAT model to: {model_save_path}")
 
         # Save AIMET encodings using recommended method
-        encodings_path = output_dir / 'aimet_power_of_2_qat_final_encodings.json'
+        encodings_path = output_dir / 'aimet_qat_optimal_scales_encodings.json'
         quantsim.save_encodings_to_json(
             str(output_dir),
-            'aimet_power_of_2_qat_final_encodings'
+            'aimet_qat_optimal_scales_encodings'
         )
         print(f"✅ Saved AIMET encodings to: {encodings_path}")
 
@@ -640,7 +645,8 @@ def main():
         print("Continuing with results...")
 
     print(f"\nSaved results to: {results_file}")
-    print(f"Saved best model to: {best_model_path}")
+    print(f"Saved best AIMET QAT model to: {best_model_path}")
+    print(f"Saved power-of-2 constrained model to: {power_of_2_model_path}")
     print(f"Exported AIMET model to: {output_dir}/")
     print("AIMET + Power-of-2 symmetric QAT completed!")
 
