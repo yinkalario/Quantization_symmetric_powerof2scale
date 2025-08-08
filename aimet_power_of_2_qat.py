@@ -214,6 +214,10 @@ def main():
         '--no-final_ptq', dest='final_ptq', action='store_false',
         help='Skip final PTQ step'
     )
+    parser.add_argument(
+        '--skip_initial_ptq', action='store_true', default=False,
+        help='Skip initial PTQ step and go directly to QAT'
+    )
 
     args = parser.parse_args()
 
@@ -250,8 +254,12 @@ def main():
     print(f"Loading data from {args.data_path}...")
     train_loader, test_loader = load_data(config, args.data_path)
 
+    # Save original model for QAT (AIMET 2.11 requirement)
+    import copy
+    original_model = copy.deepcopy(model)
+
     # Step 1: PTQ Initialization (recommended best practice)
-    if config['qat'].get('run_ptq_first', True):
+    if config['qat'].get('run_ptq_first', True) and not args.skip_initial_ptq:
         print("\n" + "=" * 60)
         print("STEP 1: AIMET PTQ Initialization")
         print("=" * 60)
@@ -326,8 +334,9 @@ def main():
         example_input = data[:1].to(device)  # Use first sample as example
         break
 
+    # Use original model for QAT (AIMET 2.11 requirement)
     quantsim = QuantizationSimModel(
-        model=model,
+        model=original_model,  # Use original model, not PTQ-quantized model
         dummy_input=example_input,
         quant_scheme=QuantScheme.training_range_learning_with_tf_enhanced_init,
         default_output_bw=config['quantization']['output']['bitwidth'],
@@ -359,7 +368,7 @@ def main():
     )
 
     # Apply initial power-of-2 constraints
-    _ = qat_manager.apply_power_of_2_constraints(quantsim, model)
+    _ = qat_manager.apply_power_of_2_constraints(quantsim, original_model)
 
     # Setup training using config (like normal QAT)
     criterion = create_criterion(config)
@@ -398,7 +407,7 @@ def main():
             torch.save(quantsim.model.state_dict(), best_model_path)
 
     # Extract final quantization details
-    final_constraint_info = qat_manager.apply_power_of_2_constraints(quantsim, model)
+    final_constraint_info = qat_manager.apply_power_of_2_constraints(quantsim, original_model)
 
     # Final evaluation
     print("\nAIMET + Power-of-2 QAT completed!")
