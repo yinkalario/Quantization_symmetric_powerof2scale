@@ -19,22 +19,19 @@ Usage:
         --data_path ./data
 """
 
+# Standard library imports
 import argparse
 import json
 import warnings
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
+# Third-party imports
 import torch
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
 
-# Suppress PyTorch deprecation warnings
-warnings.filterwarnings("ignore", message=".*NLLLoss2d.*",
-                        category=FutureWarning)
-
-# AIMET imports (will be available after environment setup)
+# AIMET imports
 try:
     from aimet_common.defs import QuantScheme
     from aimet_torch.quantsim import QuantizationSimModel
@@ -45,24 +42,46 @@ except ImportError as e:
     AIMET_AVAILABLE = False
 
 # Local imports
-from utils.model_utils import (evaluate_model, load_config, load_data,
-                               load_model)
+from utils.model_utils import (
+    create_model, evaluate_model, load_config, load_data, load_model
+)
 from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
+
+# Suppress PyTorch deprecation warnings
+warnings.filterwarnings("ignore", message=".*NLLLoss2d.*",
+                        category=FutureWarning)
 
 
 class AIMETPowerOf2Quantizer:
     """
     Hybrid quantizer that uses AIMET infrastructure with power-of-2 constraints.
+
+    This class combines AIMET's quantization simulation with custom power-of-2
+    scale factor constraints for hardware-efficient deployment.
+
+    Args:
+        config: Configuration dictionary containing quantization parameters
     """
 
     def __init__(self, config: Dict[str, Any]):
+        """Initialize the AIMET Power-of-2 quantizer."""
         self.config = config
         self.quantizer = MultiBitwidthPowerOf2Quantizer(config)
 
     def apply_power_of_2_constraints(self, original_model, quantsim: QuantizationSimModel = None):
-        """Apply power-of-2 constraints to AIMET quantizers."""
+        """
+        Apply power-of-2 constraints to AIMET quantizers.
+
+        Args:
+            original_model: Original unquantized model for analysis
+            quantsim: AIMET QuantizationSimModel (optional, for compatibility)
+
+        Returns:
+            Dict containing power-of-2 constraint information for each layer
+        """
         print("Applying power-of-2 constraints to AIMET quantizers...")
         print("\nProcessing layers:")
+        _ = quantsim  # Not used in current implementation, kept for compatibility
 
         constraint_info = {}
         processed_layers = []
@@ -112,6 +131,7 @@ def load_data_aimet(data_path: str, batch_size: int = 128) -> Tuple[DataLoader, 
 
 
 def main():
+    """Main function for AIMET Power-of-2 PTQ."""
     # Check AIMET availability first
     if not AIMET_AVAILABLE:
         print("❌ AIMET is not available!")
@@ -177,7 +197,6 @@ def main():
     except Exception as e:
         print(f"⚠️  Model loading failed: {e}")
         print("Creating a new model with random weights...")
-        from utils.model_utils import create_model
         model = create_model(config, device)
 
     # Load data

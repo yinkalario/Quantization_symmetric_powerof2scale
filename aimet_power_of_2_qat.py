@@ -19,23 +19,24 @@ Usage:
         --data_path ./data --epochs 10
 """
 
+# Standard library imports
 import argparse
+import copy
 import json
 import warnings
 from pathlib import Path
-from typing import Tuple, Dict, Any
+from typing import Any, Dict, Tuple
 
+# Third-party imports
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
+from torch import nn, optim
 from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
 
-# AIMET imports (AIMET 2.11)
+# AIMET imports
 try:
-    from aimet_torch.quantsim import QuantizationSimModel
     from aimet_common.defs import QuantScheme
+    from aimet_torch.quantsim import QuantizationSimModel
     AIMET_AVAILABLE = True
 except ImportError as e:
     print(f"AIMET not available: {e}")
@@ -44,8 +45,8 @@ except ImportError as e:
 
 # Local imports
 from utils.model_utils import (
-    load_config, load_model, load_data, evaluate_model,
-    create_criterion, create_optimizer, create_scheduler
+    create_criterion, create_model, create_optimizer, create_scheduler,
+    evaluate_model, load_config, load_data, load_model
 )
 from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
 
@@ -56,17 +57,34 @@ warnings.filterwarnings("ignore", message=".*NLLLoss2d.*",
 
 class AIMETPowerOf2QATManager:
     """
-    Manages AIMET QAT with power-of-2 scale constraints.
+    Manages AIMET Quantization Aware Training with power-of-2 scale constraints.
+
+    This class provides functionality to apply power-of-2 constraints to AIMET's
+    quantization simulation models, enabling hardware-efficient quantization
+    with bit-shift operations.
+
+    Args:
+        config: Configuration dictionary containing quantization parameters
     """
 
     def __init__(self, config: Dict[str, Any]):
+        """Initialize the AIMET Power-of-2 QAT manager."""
         self.config = config
         self.quantizer = MultiBitwidthPowerOf2Quantizer(config)
 
     def apply_power_of_2_constraints(self, quantsim: QuantizationSimModel, original_model=None):
-        """Apply power-of-2 constraints analysis for AIMET 2.11."""
-        print("Applying power-of-2 constraints analysis (AIMET 2.11)...")
-        _ = quantsim  # Not used in AIMET 2.11, but kept for API compatibility
+        """
+        Apply power-of-2 constraints analysis to AIMET quantization model.
+
+        Args:
+            quantsim: AIMET QuantizationSimModel instance
+            original_model: Original unquantized model for analysis
+
+        Returns:
+            Dict containing power-of-2 constraint information for each layer
+        """
+        print("Applying power-of-2 constraints analysis...")
+        _ = quantsim  # Not used in current AIMET version, kept for API compatibility
 
         constraint_info = {}
 
@@ -101,14 +119,30 @@ class AIMETPowerOf2QATManager:
         return constraint_info
 
     def update_power_of_2_constraints_during_training(self, quantsim: QuantizationSimModel):
-        """Update power-of-2 constraints periodically during training."""
-        # In AIMET 2.11, we can't directly update quantizer encodings
-        # This is a limitation of the new API - skip updates
+        """
+        Update power-of-2 constraints periodically during training.
+
+        Note: In current AIMET version, direct quantizer encoding updates
+        are not supported, so this method is a no-op.
+
+        Args:
+            quantsim: AIMET QuantizationSimModel instance
+        """
+        # Current AIMET version doesn't support direct quantizer updates
         _ = quantsim  # Suppress unused parameter warning
 
 
 def load_data_aimet(data_path: str, batch_size: int = 128) -> Tuple[DataLoader, DataLoader]:
-    """Load CIFAR-10 dataset."""
+    """
+    Load CIFAR-10 dataset for AIMET training.
+
+    Args:
+        data_path: Path to dataset directory
+        batch_size: Batch size for data loaders
+
+    Returns:
+        Tuple of (train_loader, test_loader)
+    """
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -144,6 +178,22 @@ def train_epoch_with_aimet_power_of_2(
     qat_manager: AIMETPowerOf2QATManager,
     update_frequency: int = 100
 ) -> float:
+    """
+    Train one epoch with AIMET quantization and power-of-2 constraints.
+
+    Args:
+        quantsim: AIMET QuantizationSimModel
+        train_loader: Training data loader
+        optimizer: Optimizer for training
+        criterion: Loss function
+        device: Device for computation
+        epoch: Current epoch number
+        qat_manager: Power-of-2 constraint manager
+        update_frequency: Frequency for constraint updates
+
+    Returns:
+        Average training loss for the epoch
+    """
     """Train one epoch with AIMET QAT and power-of-2 constraints."""
     quantsim.model.train()
     running_loss = 0.0
@@ -169,6 +219,7 @@ def train_epoch_with_aimet_power_of_2(
 
 
 def main():
+    """Main function for AIMET Power-of-2 QAT training."""
     # Check AIMET availability first
     if not AIMET_AVAILABLE:
         print("❌ AIMET is not available!")
@@ -247,15 +298,13 @@ def main():
     except Exception as e:
         print(f"⚠️  Model loading failed: {e}")
         print("Creating a new model with random weights...")
-        from utils.model_utils import create_model
         model = create_model(config, device)
 
     # Load data
     print(f"Loading data from {args.data_path}...")
     train_loader, test_loader = load_data(config, args.data_path)
 
-    # Save original model for QAT (AIMET 2.11 requirement)
-    import copy
+    # Save original model for QAT (AIMET requirement)
     original_model = copy.deepcopy(model)
 
     # Step 1: PTQ Initialization (recommended best practice)
@@ -406,8 +455,56 @@ def main():
             best_model_path = output_dir / 'best_aimet_power_of_2_qat_model.pth'
             torch.save(quantsim.model.state_dict(), best_model_path)
 
-    # Extract final quantization details
-    final_constraint_info = qat_manager.apply_power_of_2_constraints(quantsim, original_model)
+    # Extract final quantization details from trained QAT model
+    print("\n" + "=" * 60)
+    print("ANALYZING TRAINED QAT MODEL")
+    print("=" * 60)
+
+    # Get the trained model weights (after QAT)
+    trained_model = quantsim.model
+
+    # Apply power-of-2 analysis to the TRAINED model weights
+    print("Power-of-2 analysis of TRAINED QAT model weights:")
+    final_constraint_info = qat_manager.apply_power_of_2_constraints(quantsim, trained_model)
+
+    # Also analyze original model for comparison
+    print("\nPower-of-2 analysis of ORIGINAL model weights (for comparison):")
+    original_constraint_info = qat_manager.apply_power_of_2_constraints(quantsim, original_model)
+
+    # Compare AIMET scales vs Power-of-2 scales
+    print("\n" + "=" * 60)
+    print("AIMET vs POWER-OF-2 SCALE COMPARISON")
+    print("=" * 60)
+
+    try:
+        # Try to extract AIMET's actual quantization scales
+        aimet_scales = {}
+        for name, module in trained_model.named_modules():
+            if hasattr(module, 'param_quantizers') and 'weight' in module.param_quantizers:
+                weight_quantizer = module.param_quantizers['weight']
+                if hasattr(weight_quantizer, 'encoding') and weight_quantizer.encoding:
+                    aimet_scales[f"{name}.weight"] = weight_quantizer.encoding.scale
+
+        if aimet_scales:
+            print("Comparison of quantization scales:")
+            for layer_name in final_constraint_info.keys():
+                if layer_name in aimet_scales:
+                    aimet_scale = aimet_scales[layer_name]
+                    power_of_2_scale = final_constraint_info[layer_name]['scale']
+                    difference = abs(aimet_scale - power_of_2_scale) / aimet_scale * 100
+
+                    print(f"  {layer_name}:")
+                    print(f"    AIMET scale:     {aimet_scale:.8f}")
+                    print(f"    Power-of-2 scale: {power_of_2_scale:.8f} = {final_constraint_info[layer_name]['power_of_2']}")
+                    print(f"    Difference:      {difference:.2f}%")
+                    print(f"    Hardware op:     {final_constraint_info[layer_name]['hardware_op']}")
+        else:
+            print("⚠️  Could not extract AIMET scales for comparison")
+            print("This is expected in current AIMET versions")
+
+    except Exception as e:
+        print(f"⚠️  Scale comparison failed: {e}")
+        print("Showing power-of-2 analysis only")
 
     # Final evaluation
     print("\nAIMET + Power-of-2 QAT completed!")
@@ -430,7 +527,12 @@ def main():
         'ptq_quantization_details': (ptq_constraint_info
                                      if config['qat'].get('run_ptq_first', True)
                                      else None),
-        'final_quantization_details': final_constraint_info
+        'quantization_analysis': {
+            'trained_model_power_of_2': final_constraint_info,
+            'original_model_power_of_2': original_constraint_info,
+            'note': ('trained_model_power_of_2 shows power-of-2 analysis of weights '
+                     'after AIMET QAT training')
+        }
     }
 
     results_file = output_dir / 'aimet_power_of_2_qat_results.json'

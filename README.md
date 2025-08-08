@@ -8,6 +8,7 @@ Simple, plug-and-play PyTorch quantization with:
 - **JSON output format** (clean, structured results)
 - **AIMET integration** (industry-standard quantization toolkit)
 - **Dual implementation** (custom + AIMET versions)
+- **Clean, organized code** (proper imports, docstrings, type hints)
 
 ## 🚀 Quickstart
 
@@ -57,6 +58,9 @@ python aimet_power_of_2_ptq.py --data_path data/ --model_path model.pth
 
 # AIMET QAT (with power-of-2 constraints)
 python aimet_power_of_2_qat.py --data_path data/ --model_path model.pth --epochs 5
+
+# Skip initial PTQ for faster training
+python aimet_power_of_2_qat.py --data_path data/ --model_path model.pth --epochs 5 --skip_initial_ptq
 ```
 
 ## 🔧 Using Your Own Model and Dataset
@@ -162,12 +166,13 @@ training:
 |---------|----------------------|---------------------|
 | **Ease of Use** | Simple, educational | Industry-standard |
 | **Power-of-2 Scales** | ✅ Built-in | ✅ Custom constraints |
-| **3-Step Pipeline** | ✅ PTQ→QAT→PTQ | ✅ PTQ→QAT |
+| **3-Step Pipeline** | ✅ PTQ→QAT→PTQ | ✅ PTQ→QAT→PTQ |
 | **Input/Output Quantization** | ✅ Full coverage | ✅ AIMET managed |
 | **Hardware Optimization** | ✅ Bit-shift operations | ✅ AIMET optimized |
 | **Production Ready** | ✅ Research/Education | ✅ Industry deployment |
 | **Flexibility** | High (custom logic) | Medium (AIMET framework) |
 | **Dependencies** | PyTorch only | PyTorch + AIMET |
+| **Code Quality** | ✅ Clean, documented | ✅ Clean, documented |
 
 **When to use Custom:**
 - Learning quantization concepts
