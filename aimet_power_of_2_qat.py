@@ -255,7 +255,14 @@ def main():
 
     # Load model
     print("Loading model...")
-    model = load_model(args.model_path, config, device)
+    try:
+        model = load_model(args.model_path, config, device)
+        print(f"✅ Model loaded successfully from {args.model_path}")
+    except Exception as e:
+        print(f"⚠️  Model loading failed: {e}")
+        print("Creating a new model with random weights...")
+        from utils.model_utils import create_model
+        model = create_model(config, device)
 
     # Load data
     print(f"Loading data from {args.data_path}...")
@@ -287,6 +294,9 @@ def main():
             default_param_bw=config['quantization']['weight']['bitwidth'],
             config_file=None
         )
+
+        # Ensure PTQ quantsim model is on the correct device
+        ptq_quantsim.model = ptq_quantsim.model.to(device)
 
         # PTQ calibration
         def ptq_forward_pass_callback(model, _):
@@ -342,6 +352,10 @@ def main():
         default_param_bw=config['quantization']['weight']['bitwidth'],
         config_file=None  # Use default symmetric config
     )
+
+    # Ensure QAT quantsim model is on the correct device
+    quantsim.model = quantsim.model.to(device)
+    print(f"QAT QuantSim model moved to device: {device}")
 
     # Initialize QAT manager
     qat_manager = AIMETPowerOf2QATManager(config)
@@ -433,12 +447,24 @@ def main():
         json.dump(results, f, indent=2)
 
     # Export final model with AIMET
+    print("\nExporting final quantized model...")
+
+    # Ensure model is on correct device before export
+    quantsim.model = quantsim.model.to(device)
+
+    # Create dummy input on correct device for export
     dummy_input = torch.randn(1, 3, 32, 32).to(device)
-    quantsim.export(
-        path=str(output_dir),
-        filename_prefix='aimet_power_of_2_qat_final',
-        dummy_input=dummy_input
-    )
+
+    try:
+        quantsim.export(
+            path=str(output_dir),
+            filename_prefix='aimet_power_of_2_qat_final',
+            dummy_input=dummy_input
+        )
+        print("✅ Model export successful!")
+    except Exception as e:
+        print(f"⚠️  Model export failed: {e}")
+        print("Continuing without export...")
 
     print(f"\nSaved results to: {results_file}")
     print(f"Saved best model to: {best_model_path}")

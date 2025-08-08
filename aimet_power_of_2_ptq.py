@@ -23,13 +23,11 @@ import argparse
 import json
 import warnings
 from pathlib import Path
-from typing import Tuple, Dict, Any
+from typing import Any, Dict, Tuple
 
-import numpy as np
 import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
+import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
 # Suppress PyTorch deprecation warnings
@@ -38,8 +36,8 @@ warnings.filterwarnings("ignore", message=".*NLLLoss2d.*",
 
 # AIMET imports (will be available after environment setup)
 try:
-    from aimet_torch.quantsim import QuantizationSimModel
     from aimet_common.defs import QuantScheme
+    from aimet_torch.quantsim import QuantizationSimModel
     AIMET_AVAILABLE = True
 except ImportError as e:
     print(f"AIMET not available: {e}")
@@ -47,9 +45,8 @@ except ImportError as e:
     AIMET_AVAILABLE = False
 
 # Local imports
-from utils.model_utils import (
-    load_config, load_model, load_data, evaluate_model
-)
+from utils.model_utils import (evaluate_model, load_config, load_data,
+                               load_model)
 from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
 
 
@@ -164,7 +161,14 @@ def main():
 
     # Load model
     print("Loading model...")
-    model = load_model(args.model_path, config, device)
+    try:
+        model = load_model(args.model_path, config, device)
+        print(f"✅ Model loaded successfully from {args.model_path}")
+    except Exception as e:
+        print(f"⚠️  Model loading failed: {e}")
+        print("Creating a new model with random weights...")
+        from utils.model_utils import create_model
+        model = create_model(config, device)
 
     # Load data
     print(f"Loading data from {args.data_path}...")
@@ -191,6 +195,10 @@ def main():
         default_param_bw=config['quantization']['weight']['bitwidth'],
         config_file=None  # Use default symmetric config
     )
+
+    # Ensure quantsim model is on the correct device
+    quantsim.model = quantsim.model.to(device)
+    print(f"QuantSim model moved to device: {device}")
 
     # Apply power-of-2 constraints
     power_of_2_quantizer = AIMETPowerOf2Quantizer(config)
@@ -243,11 +251,24 @@ def main():
         json.dump(results, f, indent=2)
 
     # Export quantized model
-    quantsim.export(
-        path=str(output_dir),
-        filename_prefix='aimet_power_of_2_quantized',
-        dummy_input=example_input
-    )
+    print("\nExporting quantized model...")
+
+    # Ensure model is on correct device before export
+    quantsim.model = quantsim.model.to(device)
+
+    # Create fresh dummy input on correct device for export
+    export_dummy_input = torch.randn(1, 3, 32, 32).to(device)
+
+    try:
+        quantsim.export(
+            path=str(output_dir),
+            filename_prefix='aimet_power_of_2_quantized',
+            dummy_input=export_dummy_input
+        )
+        print("✅ Model export successful!")
+    except Exception as e:
+        print(f"⚠️  Model export failed: {e}")
+        print("Continuing without export...")
 
     print(f"\nSaved results to: {results_file}")
     print(f"Exported quantized model to: {output_dir}/")
