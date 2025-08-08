@@ -446,35 +446,43 @@ def main():
     with open(results_file, 'w', encoding='utf-8') as f:
         json.dump(results, f, indent=2)
 
-    # Export final model with AIMET
-    print("\nExporting final quantized model...")
-
-    # Force everything to CPU for ONNX export (AIMET compatibility)
-    print("Moving model to CPU for ONNX export compatibility...")
-    quantsim.model = quantsim.model.cpu()
-
-    # Create dummy input on CPU for export
-    dummy_input = torch.randn(1, 3, 32, 32)  # CPU tensor
+    # Save quantized model and encodings (AIMET recommended approach)
+    print("\nSaving quantized model and encodings...")
 
     try:
-        quantsim.export(
-            path=str(output_dir),
-            filename_prefix='aimet_power_of_2_qat_final',
-            dummy_input=dummy_input
-        )
-        print("✅ Model export successful!")
-    except Exception as e:
-        print(f"⚠️  Model export failed: {e}")
-        print("This is a known AIMET/ONNX compatibility issue.")
-        print("Quantization results are still valid - continuing without export...")
+        # Save PyTorch model
+        model_save_path = output_dir / 'aimet_power_of_2_qat_final.pth'
+        torch.save(quantsim.model.state_dict(), model_save_path)
+        print(f"✅ Saved PyTorch model to: {model_save_path}")
 
-        # Try to save just the PyTorch model without ONNX
+        # Save AIMET encodings using recommended method
+        encodings_path = output_dir / 'aimet_power_of_2_qat_final_encodings.json'
+        quantsim.save_encodings_to_json(
+            str(output_dir),
+            'aimet_power_of_2_qat_final_encodings'
+        )
+        print(f"✅ Saved AIMET encodings to: {encodings_path}")
+
+        # Optional: Try ONNX export if needed (may still have device issues)
         try:
-            model_save_path = output_dir / 'quantized_model.pth'
-            torch.save(quantsim.model.state_dict(), model_save_path)
-            print(f"✅ Saved PyTorch model to: {model_save_path}")
-        except Exception as save_e:
-            print(f"⚠️  PyTorch model save also failed: {save_e}")
+            print("Attempting ONNX export (optional)...")
+            quantsim.model = quantsim.model.cpu()
+            dummy_input = torch.randn(1, 3, 32, 32)
+
+            quantsim.export(
+                path=str(output_dir),
+                filename_prefix='aimet_power_of_2_qat_final_onnx',
+                dummy_input=dummy_input
+            )
+            print("✅ ONNX export successful!")
+        except Exception as onnx_e:
+            print(f"⚠️  ONNX export failed (expected): {onnx_e}")
+            print("PyTorch model and encodings saved successfully - "
+                  "this is sufficient for most use cases.")
+
+    except Exception as e:
+        print(f"⚠️  Model/encodings save failed: {e}")
+        print("Continuing with results...")
 
     print(f"\nSaved results to: {results_file}")
     print(f"Saved best model to: {best_model_path}")
