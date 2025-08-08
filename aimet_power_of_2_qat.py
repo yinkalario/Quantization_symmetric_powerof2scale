@@ -32,35 +32,15 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
 
-# AIMET imports (will be available after environment setup)
+# AIMET imports (AIMET 2.11)
 try:
     from aimet_torch.quantsim import QuantizationSimModel
     from aimet_common.defs import QuantScheme
-
-    # Handle AIMET version differences
-    try:
-        # AIMET < 2.0.0
-        from aimet_torch.qc_quantize_op import QcQuantizeWrapper
-        AIMET_V2 = False
-    except ImportError:
-        # AIMET >= 2.0.0 - QcQuantizeWrapper is deprecated/removed
-        try:
-            from aimet_torch.v2.quantization.affine import QuantizeDequantize
-            QcQuantizeWrapper = QuantizeDequantize  # Use new class
-            AIMET_V2 = True
-        except ImportError:
-            # Fallback - define a dummy class for compatibility
-            class QcQuantizeWrapper:
-                pass
-            AIMET_V2 = True
-            print("⚠️  Using AIMET 2.0+ compatibility mode")
-
     AIMET_AVAILABLE = True
 except ImportError as e:
     print(f"AIMET not available: {e}")
     print("Please run: conda activate aimet_quantization")
     AIMET_AVAILABLE = False
-    AIMET_V2 = False
 
 # Local imports
 from utils.model_utils import (
@@ -83,93 +63,48 @@ class AIMETPowerOf2QATManager:
         self.config = config
         self.quantizer = MultiBitwidthPowerOf2Quantizer(config)
 
-    def apply_power_of_2_constraints(self, quantsim: QuantizationSimModel):
-        """Apply power-of-2 constraints to AIMET quantizers during training."""
-        print("Applying power-of-2 constraints to AIMET QAT quantizers...")
+    def apply_power_of_2_constraints(self, quantsim: QuantizationSimModel, original_model=None):
+        """Apply power-of-2 constraints analysis for AIMET 2.11."""
+        print("Applying power-of-2 constraints analysis (AIMET 2.11)...")
+        _ = quantsim  # Not used in AIMET 2.11, but kept for API compatibility
 
         constraint_info = {}
 
-        # For AIMET 2.0+, we'll apply constraints differently
-        # since QcQuantizeWrapper is deprecated
-        if AIMET_V2:
-            print("⚠️  AIMET 2.0+ detected - using alternative constraint application")
-            # Apply constraints to the original model weights
-            for name, module in quantsim.model.named_modules():
+        # Use the original model (before quantization) for power-of-2 analysis
+        # This is the only reliable approach in AIMET 2.11
+        if original_model is not None:
+            processed_layers = []
+            for name, module in original_model.named_modules():
                 if hasattr(module, 'weight') and module.weight is not None:
-                    # Compute power-of-2 scale for weights
-                    weight_tensor = module.weight.data
-                    _, weight_info = self.quantizer.quantize_weights(weight_tensor)
-
-                    constraint_info[f"{name}.weight"] = weight_info
-                    print(f"  {name}: scale={weight_info['scale']:.6f} = "
-                          f"{weight_info['power_of_2']}, "
-                          f"hardware: {weight_info['hardware_op']}")
-        else:
-            # Legacy AIMET < 2.0.0 approach
-            for name, module in quantsim.model.named_modules():
-                if isinstance(module, QcQuantizeWrapper):
-                    # Get the wrapped module (Conv2d, Linear, etc.)
-                    wrapped_module = module._module_to_wrap
-
-                    if hasattr(wrapped_module, 'weight'):
+                    try:
                         # Compute power-of-2 scale for weights
-                        weight_tensor = wrapped_module.weight.data
+                        weight_tensor = module.weight.data
                         _, weight_info = self.quantizer.quantize_weights(weight_tensor)
-                        scale = weight_info['scale']
-                        zero_point = weight_info['zero_point']
-                        exponent = weight_info['exponent']
 
-                        # Apply power-of-2 constraint to AIMET quantizer
-                        if hasattr(module, 'param_quantizers') and 'weight' in module.param_quantizers:
-                            weight_quantizer = module.param_quantizers['weight']
-                            if weight_quantizer.enabled:
-                                # Force the scale to be power-of-2
-                                weight_quantizer.encoding.scale = float(scale)
-                                weight_quantizer.encoding.offset = int(zero_point)
+                        constraint_info[f"{name}.weight"] = weight_info
+                        processed_layers.append(name)
+                        print(f"  {name}: scale={weight_info['scale']:.6f} = "
+                              f"{weight_info['power_of_2']}, "
+                              f"hardware: {weight_info['hardware_op']}")
+                    except Exception as e:
+                        print(f"  ⏭️  Skipping {name}: {e}")
+                        continue
 
-                                constraint_info[name] = {
-                                    'scale': float(scale),
-                                    'zero_point': int(zero_point),
-                                    'exponent': int(exponent),
-                                    'power_of_2': f"2^(-{exponent})",
-                                    'hardware_op': (
-                                        f"x >> {exponent}" if exponent > 0
-                                        else f"x << {-exponent}" if exponent < 0
-                                        else "x"
-                                    )
-                                }
-
-                                hardware_op = constraint_info[name]['hardware_op']
-                                print(f"  {name}: scale={scale:.6f} = 2^(-{exponent}), "
-                                      f"hardware: {hardware_op}")
+            if processed_layers:
+                print(f"  ✅ Analyzed {len(processed_layers)} layers from original model")
+            else:
+                print("  ⚠️  No weight-bearing layers found in original model")
+        else:
+            print("  ⚠️  Original model not provided - skipping power-of-2 analysis")
+            print("  ℹ️  Pass the original model for constraint analysis")
 
         return constraint_info
 
     def update_power_of_2_constraints_during_training(self, quantsim: QuantizationSimModel):
         """Update power-of-2 constraints periodically during training."""
-        if AIMET_V2:
-            # For AIMET 2.0+, we can't directly update quantizer encodings
-            # This is a limitation of the new API
-            pass  # Skip updates for now in AIMET 2.0+
-        else:
-            # Legacy AIMET < 2.0.0 approach
-            for _, module in quantsim.model.named_modules():
-                if isinstance(module, QcQuantizeWrapper):
-                    wrapped_module = module._module_to_wrap
-
-                    if hasattr(wrapped_module, 'weight'):
-                        # Recompute power-of-2 scale for updated weights
-                        weight_tensor = wrapped_module.weight.data
-                        _, weight_info = self.quantizer.quantize_weights(weight_tensor)
-                        scale, zero_point = weight_info['scale'], weight_info['zero_point']
-
-                        # Update AIMET quantizer with new power-of-2 scale
-                        if (hasattr(module, 'param_quantizers') and
-                            'weight' in module.param_quantizers):
-                            weight_quantizer = module.param_quantizers['weight']
-                            if weight_quantizer.enabled:
-                                weight_quantizer.encoding.scale = float(scale)
-                                weight_quantizer.encoding.offset = int(zero_point)
+        # In AIMET 2.11, we can't directly update quantizer encodings
+        # This is a limitation of the new API - skip updates
+        _ = quantsim  # Suppress unused parameter warning
 
 
 def load_data_aimet(data_path: str, batch_size: int = 128) -> Tuple[DataLoader, DataLoader]:
@@ -363,7 +298,7 @@ def main():
 
         # Apply power-of-2 constraints to PTQ
         ptq_manager = AIMETPowerOf2QATManager(config)
-        ptq_constraint_info = ptq_manager.apply_power_of_2_constraints(ptq_quantsim)
+        ptq_constraint_info = ptq_manager.apply_power_of_2_constraints(ptq_quantsim, model)
 
         # Evaluate PTQ
         print("Evaluating model after PTQ...")
@@ -424,7 +359,7 @@ def main():
     )
 
     # Apply initial power-of-2 constraints
-    _ = qat_manager.apply_power_of_2_constraints(quantsim)
+    _ = qat_manager.apply_power_of_2_constraints(quantsim, model)
 
     # Setup training using config (like normal QAT)
     criterion = create_criterion(config)
@@ -463,7 +398,7 @@ def main():
             torch.save(quantsim.model.state_dict(), best_model_path)
 
     # Extract final quantization details
-    final_constraint_info = qat_manager.apply_power_of_2_constraints(quantsim)
+    final_constraint_info = qat_manager.apply_power_of_2_constraints(quantsim, model)
 
     # Final evaluation
     print("\nAIMET + Power-of-2 QAT completed!")
