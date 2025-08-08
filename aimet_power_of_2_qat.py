@@ -12,27 +12,30 @@ Features:
 - Hardware-optimized bit-shift operations
 
 Author: Yin Cao
+Date: August 8, 2025
 
 Usage:
-    python aimet_power_of_2_qat.py --model_path pretrained_model.pth --data_path ./data --epochs 10
+    python aimet_power_of_2_qat.py --model_path pretrained_model.pth \
+        --data_path ./data --epochs 10
 """
 
 import argparse
-import yaml
+import json
+import warnings
 from pathlib import Path
+from typing import Tuple, Dict, Any
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
-import numpy as np
-from typing import Tuple, Dict, Any
 
 # AIMET imports (will be available after environment setup)
 try:
     from aimet_torch.quantsim import QuantizationSimModel
-    from aimet_common.defs import QuantScheme, QuantizationDataType
+    from aimet_common.defs import QuantScheme
     from aimet_torch.qc_quantize_op import QcQuantizeWrapper
     AIMET_AVAILABLE = True
 except ImportError:
@@ -40,9 +43,15 @@ except ImportError:
     AIMET_AVAILABLE = False
 
 # Local imports
-from utils.model_utils import (load_config, load_model, load_data, evaluate_model,
-                              create_criterion, create_optimizer, create_scheduler)
+from utils.model_utils import (
+    load_config, load_model, load_data, evaluate_model,
+    create_criterion, create_optimizer, create_scheduler
+)
 from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
+
+# Suppress PyTorch deprecation warnings
+warnings.filterwarnings("ignore", message=".*NLLLoss2d.*",
+                        category=FutureWarning)
 
 
 class AIMETPowerOf2QATManager:
@@ -69,7 +78,9 @@ class AIMETPowerOf2QATManager:
                     # Compute power-of-2 scale for weights
                     weight_tensor = wrapped_module.weight.data
                     _, weight_info = self.quantizer.quantize_weights(weight_tensor)
-                    scale, zero_point, exponent = weight_info['scale'], weight_info['zero_point'], weight_info['exponent']
+                    scale = weight_info['scale']
+                    zero_point = weight_info['zero_point']
+                    exponent = weight_info['exponent']
 
                     # Apply power-of-2 constraint to AIMET quantizer
                     if hasattr(module, 'param_quantizers') and 'weight' in module.param_quantizers:
@@ -84,10 +95,16 @@ class AIMETPowerOf2QATManager:
                                 'zero_point': int(zero_point),
                                 'exponent': int(exponent),
                                 'power_of_2': f"2^(-{exponent})",
-                                'hardware_op': f"x >> {exponent}" if exponent > 0 else f"x << {-exponent}" if exponent < 0 else "x"
+                                'hardware_op': (
+                                    f"x >> {exponent}" if exponent > 0
+                                    else f"x << {-exponent}" if exponent < 0
+                                    else "x"
+                                )
                             }
 
-                            print(f"  {name}: scale={scale:.6f} = 2^(-{exponent}), hardware: {constraint_info[name]['hardware_op']}")
+                            hardware_op = constraint_info[name]['hardware_op']
+                            print(f"  {name}: scale={scale:.6f} = 2^(-{exponent}), "
+                                  f"hardware: {hardware_op}")
 
         return constraint_info
 
@@ -126,7 +143,9 @@ def load_data_aimet(data_path: str, batch_size: int = 128) -> Tuple[DataLoader, 
     ])
 
     # Training data
-    train_dataset = datasets.CIFAR10(data_path, train=True, download=True, transform=transform_train)
+    train_dataset = datasets.CIFAR10(
+        data_path, train=True, download=True, transform=transform_train
+    )
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
 
     # Test data
@@ -134,9 +153,6 @@ def load_data_aimet(data_path: str, batch_size: int = 128) -> Tuple[DataLoader, 
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     return train_loader, test_loader
-
-
-
 
 
 def train_epoch_with_aimet_power_of_2(
@@ -183,19 +199,42 @@ def main():
         print("  conda activate aimet_quantization")
         return
 
-    parser = argparse.ArgumentParser(description='AIMET + Power-of-2 Symmetric QAT')
-    parser.add_argument('--config', type=str, default='configs/quantization_config.yaml',
-                       help='Path to configuration file')
-    parser.add_argument('--model_path', type=str, default='model.pth',
-                       help='Path to pretrained model file (optional)')
-    parser.add_argument('--data_path', type=str, default='data/',
-                       help='Path to dataset')
-    parser.add_argument('--output_dir', type=str, default=None,
-                       help='Output directory (overrides config)')
-    parser.add_argument('--epochs', type=int, default=None,
-                       help='Number of training epochs (overrides config)')
-    parser.add_argument('--device', type=str, default='auto',
-                       help='Device: cuda, cpu, or auto')
+    parser = argparse.ArgumentParser(
+        description='AIMET + Power-of-2 Symmetric QAT'
+    )
+    parser.add_argument(
+        '--config', type=str, default='configs/quantization_config.yaml',
+        help='Path to configuration file (YAML)'
+    )
+    parser.add_argument(
+        '--model_path', type=str, default='model.pth',
+        help='Path to pretrained model file (optional)'
+    )
+    parser.add_argument(
+        '--data_path', type=str, default='data/',
+        help='Path to dataset'
+    )
+    parser.add_argument(
+        '--output_dir', type=str, default=None,
+        help='Output directory (overrides config)'
+    )
+    parser.add_argument(
+        '--epochs', type=int, default=None,
+        help='Number of training epochs (overrides config)'
+    )
+    parser.add_argument(
+        '--device', type=str, default='auto',
+        help='Device: cuda, cpu, or auto'
+    )
+    parser.add_argument(
+        '--final_ptq', action='store_true', default=True,
+        help='Apply final PTQ for input/output quantization after QAT '
+             '(default: True)'
+    )
+    parser.add_argument(
+        '--no-final_ptq', dest='final_ptq', action='store_false',
+        help='Skip final PTQ step'
+    )
 
     args = parser.parse_args()
 
@@ -215,8 +254,8 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load model
-    print(f"Loading model...")
-    model = load_model(args.model_path, device)
+    print("Loading model...")
+    model = load_model(args.model_path, config, device)
 
     # Load data
     print(f"Loading data from {args.data_path}...")
@@ -224,9 +263,9 @@ def main():
 
     # Step 1: PTQ Initialization (recommended best practice)
     if config['qat'].get('run_ptq_first', True):
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("STEP 1: AIMET PTQ Initialization")
-        print("="*60)
+        print("=" * 60)
 
         # Evaluate before PTQ
         print("Evaluating model before PTQ...")
@@ -250,7 +289,7 @@ def main():
         )
 
         # PTQ calibration
-        def ptq_forward_pass_callback(model, args):
+        def ptq_forward_pass_callback(model, _):
             model.eval()
             with torch.no_grad():
                 for batch_idx, (data, _) in enumerate(train_loader):
@@ -284,9 +323,9 @@ def main():
         ptq_constraint_info = {}
 
     # Step 2: QAT Training
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("STEP 2: AIMET Quantization Aware Training")
-    print("="*60)
+    print("=" * 60)
 
     # Create AIMET QuantSim for QAT
     print("Creating AIMET QuantSim for QAT...")
@@ -308,7 +347,7 @@ def main():
     qat_manager = AIMETPowerOf2QATManager(config)
 
     # Initial calibration for QAT
-    def forward_pass_callback(model, args):
+    def forward_pass_callback(model, _):
         model.eval()
         with torch.no_grad():
             for batch_idx, (data, _) in enumerate(train_loader):
@@ -389,12 +428,17 @@ def main():
         'final_quantization_details': final_constraint_info
     }
 
-    results_file = output_dir / 'aimet_power_of_2_qat_results.yaml'
-    with open(results_file, 'w') as f:
-        yaml.dump(results, f, default_flow_style=False, indent=2)
+    results_file = output_dir / 'aimet_power_of_2_qat_results.json'
+    with open(results_file, 'w', encoding='utf-8') as f:
+        json.dump(results, f, indent=2)
 
     # Export final model with AIMET
-    quantsim.export(path=str(output_dir), filename_prefix='aimet_power_of_2_qat_final')
+    dummy_input = torch.randn(1, 3, 32, 32).to(device)
+    quantsim.export(
+        path=str(output_dir),
+        filename_prefix='aimet_power_of_2_qat_final',
+        dummy_input=dummy_input
+    )
 
     print(f"\nSaved results to: {results_file}")
     print(f"Saved best model to: {best_model_path}")

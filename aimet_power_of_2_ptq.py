@@ -12,25 +12,29 @@ Features:
 - Hardware-optimized bit-shift operations
 
 Author: Yin Cao
+Date: August 8, 2025
 
 Usage:
-    python aimet_power_of_2_ptq.py --model_path your_model.pth --data_path ./data
+    python aimet_power_of_2_ptq.py --model_path your_model.pth \
+        --data_path ./data
 """
 
 import argparse
+import json
 import warnings
-import yaml
 from pathlib import Path
+from typing import Tuple, Dict, Any
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
-import numpy as np
-from typing import Tuple, Dict, Any
 
 # Suppress PyTorch deprecation warnings
-warnings.filterwarnings("ignore", message=".*NLLLoss2d.*", category=FutureWarning)
+warnings.filterwarnings("ignore", message=".*NLLLoss2d.*",
+                        category=FutureWarning)
 
 # AIMET imports (will be available after environment setup)
 try:
@@ -43,7 +47,9 @@ except ImportError as e:
     AIMET_AVAILABLE = False
 
 # Local imports
-from utils.model_utils import load_config, load_model, load_data, evaluate_model
+from utils.model_utils import (
+    load_config, load_model, load_data, evaluate_model
+)
 from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
 
 
@@ -98,7 +104,6 @@ def load_data_aimet(data_path: str, batch_size: int = 128) -> Tuple[DataLoader, 
     return calib_loader, test_loader
 
 
-
 def main():
     # Check AIMET availability first
     if not AIMET_AVAILABLE:
@@ -109,19 +114,33 @@ def main():
         print("  conda activate aimet_quantization")
         return
 
-    parser = argparse.ArgumentParser(description='AIMET + Power-of-2 Symmetric PTQ')
-    parser.add_argument('--config', type=str, default='configs/quantization_config.yaml',
-                       help='Path to configuration file')
-    parser.add_argument('--model_path', type=str, default='model.pth',
-                       help='Path to trained model file')
-    parser.add_argument('--data_path', type=str, default='data/',
-                       help='Path to dataset')
-    parser.add_argument('--output_dir', type=str, default=None,
-                       help='Output directory (overrides config)')
-    parser.add_argument('--max_eval_batches', type=int, default=None,
-                       help='Max batches for evaluation (overrides config)')
-    parser.add_argument('--device', type=str, default='auto',
-                       help='Device: cuda, cpu, or auto')
+    parser = argparse.ArgumentParser(
+        description='AIMET + Power-of-2 Symmetric PTQ'
+    )
+    parser.add_argument(
+        '--config', type=str, default='configs/quantization_config.yaml',
+        help='Path to configuration file (YAML)'
+    )
+    parser.add_argument(
+        '--model_path', type=str, default='model.pth',
+        help='Path to trained model file'
+    )
+    parser.add_argument(
+        '--data_path', type=str, default='data/',
+        help='Path to dataset'
+    )
+    parser.add_argument(
+        '--output_dir', type=str, default=None,
+        help='Output directory (overrides config)'
+    )
+    parser.add_argument(
+        '--max_eval_batches', type=int, default=None,
+        help='Max batches for evaluation (overrides config)'
+    )
+    parser.add_argument(
+        '--device', type=str, default='auto',
+        help='Device: cuda, cpu, or auto'
+    )
 
     args = parser.parse_args()
 
@@ -144,7 +163,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load model
-    print(f"Loading model...")
+    print("Loading model...")
     model = load_model(args.model_path, config, device)
 
     # Load data
@@ -177,7 +196,7 @@ def main():
     power_of_2_quantizer = AIMETPowerOf2Quantizer(config)
 
     # Calibration callback
-    def forward_pass_callback(model, args):
+    def forward_pass_callback(model, _):
         model.eval()
         with torch.no_grad():
             for batch_idx, (data, _) in enumerate(test_loader):
@@ -203,11 +222,11 @@ def main():
 
     # Results
     accuracy_drop = original_accuracy - quantized_accuracy
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  Original accuracy:  {original_accuracy:.2f}%")
     print(f"  Quantized accuracy: {quantized_accuracy:.2f}%")
     print(f"  Accuracy drop:      {accuracy_drop:.2f}%")
-    print(f"  Quantization:       AIMET + Power-of-2 Symmetric")
+    print("  Quantization:       AIMET + Power-of-2 Symmetric")
 
     # Save results
     results = {
@@ -219,9 +238,9 @@ def main():
         'quantization_details': constraint_info
     }
 
-    results_file = output_dir / 'aimet_power_of_2_ptq_results.yaml'
-    with open(results_file, 'w') as f:
-        yaml.dump(results, f, default_flow_style=False, indent=2)
+    results_file = output_dir / 'aimet_power_of_2_ptq_results.json'
+    with open(results_file, 'w', encoding='utf-8') as f:
+        json.dump(results, f, indent=2)
 
     # Export quantized model
     quantsim.export(

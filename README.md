@@ -6,10 +6,21 @@ Simple, plug-and-play PyTorch quantization with:
 - **PTQ → QAT workflow** (best practice quantization pipeline)
 - **Complete input/output quantization** (full pipeline coverage)
 - **JSON output format** (clean, structured results)
+- **AIMET integration** (industry-standard quantization toolkit)
+- **Dual implementation** (custom + AIMET versions)
 
 ## 🚀 Quickstart
 
 ### 1. Setup Environment
+
+**For Custom Implementation:**
+```bash
+conda create -n quantization python=3.8
+conda activate quantization
+pip install torch torchvision
+```
+
+**For AIMET Implementation:**
 ```bash
 chmod +x scripts/create_env.sh
 ./scripts/create_env.sh
@@ -17,17 +28,35 @@ conda activate aimet_quantization
 ```
 
 ### 2. Run PTQ (Post-Training Quantization)
+
+**Custom Implementation:**
 ```bash
 python ptq_quantize.py --data_path data/ --max_eval_batches 10
 ```
 
+**AIMET Implementation:**
+```bash
+python aimet_power_of_2_ptq.py --data_path data/ --model_path model.pth
+```
+
 ### 3. Run QAT (Quantization Aware Training)
+
+**Custom Implementation:**
 ```bash
 # Full 3-step pipeline: PTQ → QAT → Final PTQ
 python qat_train.py --data_path data/ --epochs 5
 
 # Weight-only QAT (skip final input/output quantization)
 python qat_train.py --data_path data/ --epochs 5 --no-final_ptq
+```
+
+**AIMET Implementation:**
+```bash
+# AIMET PTQ (industry-standard)
+python aimet_power_of_2_ptq.py --data_path data/ --model_path model.pth
+
+# AIMET QAT (with power-of-2 constraints)
+python aimet_power_of_2_qat.py --data_path data/ --model_path model.pth --epochs 5
 ```
 
 ## 🔧 Using Your Own Model and Dataset
@@ -124,6 +153,33 @@ training:
 ├── requirements.txt             # Dependencies
 └── README.md                    # This file
 ```
+
+## 🔄 Implementation Comparison
+
+### Custom Implementation vs AIMET
+
+| Feature | Custom Implementation | AIMET Implementation |
+|---------|----------------------|---------------------|
+| **Ease of Use** | Simple, educational | Industry-standard |
+| **Power-of-2 Scales** | ✅ Built-in | ✅ Custom constraints |
+| **3-Step Pipeline** | ✅ PTQ→QAT→PTQ | ✅ PTQ→QAT |
+| **Input/Output Quantization** | ✅ Full coverage | ✅ AIMET managed |
+| **Hardware Optimization** | ✅ Bit-shift operations | ✅ AIMET optimized |
+| **Production Ready** | ✅ Research/Education | ✅ Industry deployment |
+| **Flexibility** | High (custom logic) | Medium (AIMET framework) |
+| **Dependencies** | PyTorch only | PyTorch + AIMET |
+
+**When to use Custom:**
+- Learning quantization concepts
+- Research and experimentation
+- Custom quantization schemes
+- Minimal dependencies
+
+**When to use AIMET:**
+- Production deployment
+- Industry-standard workflows
+- Advanced quantization features
+- Enterprise environments
 
 ## 🔧 What Makes This Special?
 
