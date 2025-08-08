@@ -293,8 +293,11 @@ def main():
         device = torch.device(args.device)
     print(f"Using device: {device}")
 
-    # Create output directory
-    output_dir = Path(args.output_dir)
+    # Setup output directory
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+    else:
+        output_dir = Path(config['output']['base_dir']) / 'aimet_qat'
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load model
