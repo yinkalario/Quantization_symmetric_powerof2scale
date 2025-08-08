@@ -62,8 +62,11 @@ class AIMETPowerOf2Quantizer:
     def apply_power_of_2_constraints(self, original_model, quantsim: QuantizationSimModel = None):
         """Apply power-of-2 constraints to AIMET quantizers."""
         print("Applying power-of-2 constraints to AIMET quantizers...")
+        print("\nProcessing layers:")
 
         constraint_info = {}
+        processed_layers = []
+        skipped_layers = []
 
         # Use the original model weights to compute power-of-2 constraints
         for name, module in original_model.named_modules():
@@ -75,11 +78,18 @@ class AIMETPowerOf2Quantizer:
 
                 # Store constraint info for reporting
                 constraint_info[f"{name}.weight"] = weight_info
-                print(f"  {name}.weight: scale={scale:.6f} = "
+                processed_layers.append(name)
+                print(f"  ✅ {name}.weight: scale={scale:.6f} = "
                       f"{weight_info['power_of_2']}, "
                       f"hardware: {weight_info['hardware_op']}, "
                       f"{weight_info['bitwidth']}-bit")
+            else:
+                skipped_layers.append(name)
+                if name:  # Don't print empty root module name
+                    print(f"  ⏭️  {name}: {type(module).__name__} (no weights)")
 
+        print(f"\nSummary: {len(processed_layers)} layers quantized, "
+              f"{len(skipped_layers)} layers skipped")
         return constraint_info
 
 
@@ -219,6 +229,17 @@ def main():
         forward_pass_callback=forward_pass_callback,
         forward_pass_callback_args=None
     )
+
+    # Debug: Print model structure to understand missing layers
+    print("\n" + "="*60)
+    print("MODEL ARCHITECTURE DEBUG")
+    print("="*60)
+    for name, module in model.named_modules():
+        if name:  # Skip the root module
+            has_weights = hasattr(module, 'weight') and module.weight is not None
+            weight_shape = module.weight.shape if has_weights else "No weights"
+            print(f"{name:20} | {type(module).__name__:15} | {weight_shape}")
+    print("="*60)
 
     # Apply power-of-2 constraints after AIMET encoding computation
     constraint_info = power_of_2_quantizer.apply_power_of_2_constraints(model, quantsim)
