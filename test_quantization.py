@@ -7,9 +7,10 @@ This script runs quick tests to verify both PTQ and QAT work correctly.
 Author: Yin Cao
 """
 
+# Standard library imports
+import os
 import subprocess
 import sys
-import os
 
 
 def run_test(name, command, timeout=120):
@@ -50,9 +51,11 @@ def main():
     tests = [
         ("Power-of-2 Quantizer Demo", "python utils/power_of_2_quantizer.py", 60),
         ("Pure PyTorch PTQ", "python ptq_quantize.py --data_path ./data --max_eval_batches 3", 120),
-        ("Pure PyTorch QAT", "python qat_train.py --data_path ./data --epochs 1 --batch_size 64", 180),
-        ("AIMET + Power-of-2 PTQ", "python aimet_power_of_2_ptq.py --data_path ./data --max_eval_batches 3", 120),
-        ("AIMET + Power-of-2 QAT", "python aimet_power_of_2_qat.py --data_path ./data --epochs 1 --batch_size 64", 180),
+        ("Pure PyTorch QAT", "python qat_train.py --data_path ./data --epochs 1", 180),
+        ("AIMET + Power-of-2 PTQ",
+         "python aimet_power_of_2_ptq.py --data_path ./data --max_eval_batches 3", 120),
+        ("AIMET + Power-of-2 QAT",
+         "python aimet_power_of_2_qat.py --data_path ./data --epochs 1", 180),
     ]
 
     results = []
@@ -77,11 +80,11 @@ def main():
     if passed == len(results):
         print("\n🎉 All tests passed! Power-of-2 quantization is working correctly.")
         return 0
-    else:
-        print(f"\n⚠️  {len(results) - passed} test(s) failed.")
-        return 1
+
+    print(f"\n⚠️  {len(results) - passed} test(s) failed.")
+    return 1
 
 
 if __name__ == '__main__':
-    exit_code = main()
-    sys.exit(exit_code)
+    EXIT_CODE = main()
+    sys.exit(EXIT_CODE)

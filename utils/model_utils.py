@@ -8,17 +8,17 @@ Author: Yin Cao
 Date: August 8, 2025
 """
 
+# Standard library imports
 import warnings
-import yaml
 from pathlib import Path
-from typing import Tuple, Dict, Any, Optional
+from typing import Any, Dict, Optional, Tuple
 
+# Third-party imports
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
+import yaml
+from torch import nn, optim
 from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
 
 # Suppress PyTorch deprecation warnings for NLLLoss2d
 warnings.filterwarnings("ignore", message=".*NLLLoss2d.*", category=FutureWarning)

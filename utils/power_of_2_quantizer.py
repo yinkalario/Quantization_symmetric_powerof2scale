@@ -8,11 +8,13 @@ Author: Yin Cao
 Date: August 8, 2025
 """
 
-import numpy as np
-from typing import Tuple, Dict, Any
+# Standard library imports
+from typing import Any, Dict, Tuple
 
+# Third-party imports
+import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class PowerOf2ScaleQuantizer:

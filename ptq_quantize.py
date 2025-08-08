@@ -19,18 +19,20 @@ Usage:
         --data_path data/
 """
 
+# Standard library imports
 import argparse
 import json
 import warnings
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
+# Third-party imports
 import torch
-import torch.nn as nn
+from torch import nn
 
 # Local imports
 from utils.model_utils import (
-    load_config, load_model, load_data, evaluate_model
+    evaluate_model, load_config, load_data, load_model
 )
 from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
 

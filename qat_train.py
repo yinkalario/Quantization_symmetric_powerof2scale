@@ -23,19 +23,21 @@ Usage:
         --data_path data/ --epochs 10
 """
 
+# Standard library imports
 import argparse
 import json
 import warnings
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
+# Third-party imports
 import torch
-import torch.nn as nn
+from torch import nn
 
 # Local imports
 from utils.model_utils import (
-    load_config, load_model, load_data, evaluate_model,
-    create_criterion, create_optimizer, create_scheduler
+    create_criterion, create_optimizer, create_scheduler,
+    evaluate_model, load_config, load_data, load_model
 )
 from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
 
@@ -301,14 +303,20 @@ def main():
     print("\n" + "=" * 60)
     print("QUANTIZATION PIPELINE COMPLETED")
     print("=" * 60)
-    print(f"Step 1 - Initial accuracy:     {initial_accuracy:.2f}%")
-    print(f"Step 1 - PTQ accuracy:         {ptq_accuracy:.2f}%")
-    print(f"Step 2 - QAT best accuracy:    {best_accuracy:.2f}%")
+    print(f"Step 1 - Initial accuracy:           {initial_accuracy:.2f}%")
+    print(f"Step 1 - PTQ accuracy:               {ptq_accuracy:.2f}%")
+    print(f"Step 2 - Weight-only QAT accuracy:   {best_accuracy:.2f}%")
     if args.final_ptq:
-        print(f"Step 3 - Final accuracy:       {final_accuracy_result:.2f}%")
-        print(f"Total improvement:             {final_accuracy_result - initial_accuracy:.2f}%")
+        print(f"Step 3 - Full quantization accuracy: {final_accuracy_result:.2f}%")
+        print("")
+        power_of_2_improvement = final_accuracy_result - initial_accuracy
+        accuracy_drop = best_accuracy - final_accuracy_result
+        print(f"Power-of-2 improvement over original: {power_of_2_improvement:+.2f}%")
+        print(f"Accuracy drop from input/output quantization: {accuracy_drop:+.2f}%")
     else:
-        print(f"Total improvement:             {best_accuracy - initial_accuracy:.2f}%")
+        weight_only_improvement = best_accuracy - initial_accuracy
+        print(f"Weight-only power-of-2 improvement:  {weight_only_improvement:+.2f}%")
+        print("Note: Input/output quantization not applied")
 
     # Save results
     results = {
@@ -322,12 +330,17 @@ def main():
         ],
         'initial_accuracy': float(initial_accuracy),
         'ptq_accuracy': float(ptq_accuracy),
-        'qat_best_accuracy': float(best_accuracy),
-        'final_accuracy': float(final_accuracy_result),
-        'total_improvement': (
+        'weight_only_qat_accuracy': float(best_accuracy),
+        'full_quantization_accuracy': float(final_accuracy_result),
+        'power_of_2_improvement': (
             float(final_accuracy_result - initial_accuracy)
             if args.final_ptq
             else float(best_accuracy - initial_accuracy)
+        ),
+        'accuracy_drop_from_input_output_quantization': (
+            float(best_accuracy - final_accuracy_result)
+            if args.final_ptq
+            else 0.0
         ),
         'epochs': epochs,
         'learning_rate': config['training']['learning_rate'],

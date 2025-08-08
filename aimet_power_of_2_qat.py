@@ -547,13 +547,16 @@ def main():
         print(f"⚠️  Scale comparison failed: {e}")
         print("Showing power-of-2 analysis only")
 
-    # Final evaluation
+    # Final evaluation summary
     print("\nAIMET + Power-of-2 QAT completed!")
-    print(f"Initial accuracy: {initial_accuracy:.2f}%")
+    print(f"Initial accuracy:                {initial_accuracy:.2f}%")
     if config['qat'].get('run_ptq_first', True):
-        print(f"PTQ accuracy:     {ptq_accuracy:.2f}%")
-    print(f"Final accuracy:   {best_accuracy:.2f}%")
-    print(f"Total improvement: {best_accuracy - initial_accuracy:.2f}%")
+        print(f"PTQ accuracy:                    {ptq_accuracy:.2f}%")
+    print(f"AIMET QAT model accuracy:        {best_accuracy:.2f}%")
+    print(f"Power-of-2 constrained accuracy: {power_of_2_accuracy:.2f}%")
+    print("")
+    print(f"Final power-of-2 improvement:    {power_of_2_improvement:+.2f}%")
+    print(f"Accuracy drop from power-of-2:   {accuracy_drop_from_power_of_2:+.2f}%")
 
     # Save results
     results = {
@@ -564,9 +567,11 @@ def main():
         'initial_accuracy': float(initial_accuracy),
         'ptq_accuracy': float(ptq_accuracy) if config['qat'].get('run_ptq_first', True) else None,
         'aimet_qat_accuracy': float(best_accuracy),
+        'final_accuracy': float(power_of_2_accuracy),  # Final result is power-of-2 constrained
         'power_of_2_accuracy': float(power_of_2_accuracy),
         'aimet_improvement': float(aimet_improvement),
         'power_of_2_improvement': float(power_of_2_improvement),
+        'total_improvement': float(power_of_2_improvement),  # Total improvement is power-of-2
         'accuracy_drop_from_power_of_2': float(accuracy_drop_from_power_of_2),
         'ptq_quantization_details': (ptq_constraint_info
                                      if config['qat'].get('run_ptq_first', True)
