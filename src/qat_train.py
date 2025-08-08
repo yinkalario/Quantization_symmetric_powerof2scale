@@ -35,20 +35,12 @@ import torch
 from torch import nn
 
 # Local imports
-try:
-    # Try relative imports first (when run as module)
-    from .utils.model_utils import (
-        create_criterion, create_optimizer, create_scheduler,
-        evaluate_model, load_config, load_data, load_model
-    )
-    from .utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
-except ImportError:
-    # Fall back to absolute imports (when run directly)
-    from utils.model_utils import (
-        create_criterion, create_optimizer, create_scheduler,
-        evaluate_model, load_config, load_data, load_model
-    )
-    from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
+from ptq_quantize import quantize_inputs_outputs, quantize_model_comprehensive
+from utils.model_utils import (
+    create_criterion, create_optimizer, create_scheduler,
+    evaluate_model, load_config, load_data, load_model
+)
+from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
 
 # Suppress PyTorch deprecation warnings
 warnings.filterwarnings("ignore", message=".*NLLLoss2d.*",
@@ -195,10 +187,6 @@ def main():
 
         # Apply PTQ
         print("Applying PTQ initialization...")
-        try:
-            from .ptq_quantize import quantize_model_comprehensive
-        except ImportError:
-            from ptq_quantize import quantize_model_comprehensive
         ptq_details = quantize_model_comprehensive(model, quantizer)
 
         # Evaluate after PTQ
@@ -274,14 +262,6 @@ def main():
             trained_model = qat_model
 
         # Apply input/output quantization using PTQ
-        # Import here to avoid circular imports
-        from .ptq_quantize import quantize_model_comprehensive
-
-        # Apply input/output quantization using calibration
-        try:
-            from .ptq_quantize import quantize_inputs_outputs
-        except ImportError:
-            from ptq_quantize import quantize_inputs_outputs
         final_ptq_details = quantize_inputs_outputs(
             trained_model, quantizer, train_loader, device, num_batches=10
         )

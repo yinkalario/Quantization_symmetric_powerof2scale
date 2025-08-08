@@ -171,7 +171,8 @@ def load_data(config: Dict[str, Any], data_path: str) -> Tuple[DataLoader, DataL
         raise ValueError(f"Unknown dataset: {dataset_name}")
 
 
-def load_your_dataset(data_path: str, batch_size: int, num_workers: int) -> Tuple[DataLoader, DataLoader]:
+def load_your_dataset(data_path: str, batch_size: int,
+                      num_workers: int) -> Tuple[DataLoader, DataLoader]:
     """
     Load your custom dataset.
 
@@ -187,15 +188,18 @@ def load_your_dataset(data_path: str, batch_size: int, num_workers: int) -> Tupl
     # train_dataset = YourCustomDataset(data_path, train=True, transform=transform)
     # test_dataset = YourCustomDataset(data_path, train=False, transform=transform)
     #
-    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    # train_loader = DataLoader(train_dataset, batch_size=batch_size,
+    #                           shuffle=True, num_workers=num_workers)
+    # test_loader = DataLoader(test_dataset, batch_size=batch_size,
+    #                          shuffle=False, num_workers=num_workers)
     #
     # return train_loader, test_loader
 
     raise NotImplementedError("Please implement your custom dataset loading logic here")
 
 
-def load_cifar10(data_path: str, batch_size: int, num_workers: int) -> Tuple[DataLoader, DataLoader]:
+def load_cifar10(data_path: str, batch_size: int,
+                 num_workers: int) -> Tuple[DataLoader, DataLoader]:
     """Load CIFAR-10 dataset."""
     # Training transforms with augmentation
     transform_train = transforms.Compose([
@@ -212,12 +216,16 @@ def load_cifar10(data_path: str, batch_size: int, num_workers: int) -> Tuple[Dat
     ])
 
     # Training data
-    train_dataset = datasets.CIFAR10(data_path, train=True, download=True, transform=transform_train)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    train_dataset = datasets.CIFAR10(data_path, train=True, download=True,
+                                     transform=transform_train)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size,
+                              shuffle=True, num_workers=num_workers)
 
     # Test data
-    test_dataset = datasets.CIFAR10(data_path, train=False, download=True, transform=transform_test)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    test_dataset = datasets.CIFAR10(data_path, train=False, download=True,
+                                    transform=transform_test)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size,
+                             shuffle=False, num_workers=num_workers)
 
     return train_loader, test_loader
 
@@ -254,7 +262,8 @@ def create_optimizer(model: nn.Module, config: Dict[str, Any]) -> optim.Optimize
         raise ValueError(f"Unknown optimizer: {optimizer_type}")
 
 
-def create_scheduler(optimizer: optim.Optimizer, config: Dict[str, Any]) -> Optional[optim.lr_scheduler._LRScheduler]:
+def create_scheduler(optimizer: optim.Optimizer,
+                     config: Dict[str, Any]) -> Optional[optim.lr_scheduler._LRScheduler]:
     """Create learning rate scheduler based on configuration."""
     training_config = config['training']
     scheduler_config = training_config.get('scheduler')
@@ -280,7 +289,7 @@ def create_scheduler(optimizer: optim.Optimizer, config: Dict[str, Any]) -> Opti
 
 
 def evaluate_model(model: nn.Module, data_loader: DataLoader, device: torch.device,
-                  max_batches: Optional[int] = None) -> float:
+                   max_batches: Optional[int] = None) -> float:
     """Evaluate model accuracy."""
     model.eval()
     correct = 0

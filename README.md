@@ -32,12 +32,12 @@ conda activate aimet_quantization
 
 **Custom Implementation:**
 ```bash
-python ptq_quantize.py --data_path data/ --max_eval_batches 10
+python src/ptq_quantize.py --data_path data/ --max_eval_batches 10
 ```
 
 **AIMET Implementation:**
 ```bash
-python aimet_power_of_2_ptq.py --data_path data/ --model_path model.pth
+python src/aimet_power_of_2_ptq.py --data_path data/ --model_path model.pth
 ```
 
 ### 3. Run QAT (Quantization Aware Training)
@@ -45,19 +45,19 @@ python aimet_power_of_2_ptq.py --data_path data/ --model_path model.pth
 **Custom Implementation:**
 ```bash
 # Full 3-step pipeline: PTQ -> QAT -> Final PTQ
-python qat_train.py --data_path data/ --epochs 5
+python src/qat_train.py --data_path data/ --epochs 5
 
 # Weight-only QAT (skip final input/output quantization)
-python qat_train.py --data_path data/ --epochs 5 --no-final_ptq
+python src/qat_train.py --data_path data/ --epochs 5 --no-final_ptq
 ```
 
 **AIMET Implementation:**
 ```bash
 # AIMET QAT (with power-of-2 analysis)
-python aimet_power_of_2_qat.py --data_path data/ --model_path model.pth --epochs 5
+python src/aimet_power_of_2_qat.py --data_path data/ --model_path model.pth --epochs 5
 
 # Skip initial PTQ for faster training
-python aimet_power_of_2_qat.py --data_path data/ --model_path model.pth --epochs 5 --skip_initial_ptq
+python src/aimet_power_of_2_qat.py --data_path data/ --model_path model.pth --epochs 5 --skip_initial_ptq
 ```
 
 ## Using Your Own Model and Dataset
@@ -142,18 +142,13 @@ training:
 ## Project Structure
 
 ```
-├── ptq_quantize.py              # Wrapper: Multi-bitwidth PTQ (Recommended)
-├── qat_train.py                 # Wrapper: Multi-bitwidth QAT with PTQ init (Recommended)
-├── aimet_power_of_2_ptq.py      # Wrapper: AIMET + Power-of-2 PTQ (Professional)
-├── aimet_power_of_2_qat.py      # Wrapper: AIMET + Power-of-2 QAT (Professional)
-├── test_quantization.py         # Wrapper: Test script
 ├── src/                         # Source code directory
 │   ├── __init__.py              # Package initialization
-│   ├── ptq_quantize.py          # Core PTQ implementation
-│   ├── qat_train.py             # Core QAT implementation
-│   ├── aimet_power_of_2_ptq.py  # Core AIMET PTQ implementation
-│   ├── aimet_power_of_2_qat.py  # Core AIMET QAT implementation
-│   ├── test_quantization.py     # Core test implementation
+│   ├── ptq_quantize.py          # Multi-bitwidth PTQ (Recommended)
+│   ├── qat_train.py             # Multi-bitwidth QAT with PTQ init (Recommended)
+│   ├── aimet_power_of_2_ptq.py  # AIMET + Power-of-2 PTQ (Professional)
+│   ├── aimet_power_of_2_qat.py  # AIMET + Power-of-2 QAT (Professional)
+│   ├── test_quantization.py     # Test script
 │   └── utils/                   # Utility modules
 │       ├── power_of_2_quantizer.py # Core quantization implementation
 │       └── model_utils.py       # Shared model/data utilities
@@ -423,6 +418,26 @@ For production-grade quantization:
 ```bash
 make ptq-aimet     # AIMET PTQ with power-of-2 analysis
 make qat-aimet     # AIMET QAT with power-of-2 analysis
+```
+
+### Running Scripts Directly
+All scripts are located in the `src/` directory:
+
+**Custom Implementation:**
+```bash
+python src/ptq_quantize.py --data_path data/ --max_eval_batches 10
+python src/qat_train.py --data_path data/ --epochs 5
+```
+
+**AIMET Implementation:**
+```bash
+python src/aimet_power_of_2_ptq.py --data_path data/
+python src/aimet_power_of_2_qat.py --data_path data/ --epochs 5
+```
+
+**Testing:**
+```bash
+python src/test_quantization.py
 ```
 
 ### Makefile Commands

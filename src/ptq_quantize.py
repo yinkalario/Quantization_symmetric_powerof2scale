@@ -31,18 +31,10 @@ import torch
 from torch import nn
 
 # Local imports
-try:
-    # Try relative imports first (when run as module)
-    from .utils.model_utils import (
-        evaluate_model, load_config, load_data, load_model
-    )
-    from .utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
-except ImportError:
-    # Fall back to absolute imports (when run directly)
-    from utils.model_utils import (
-        evaluate_model, load_config, load_data, load_model
-    )
-    from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
+from utils.model_utils import (
+    evaluate_model, load_config, load_data, load_model
+)
+from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
 
 # Suppress PyTorch deprecation warnings
 warnings.filterwarnings("ignore", message=".*NLLLoss2d.*",
@@ -241,8 +233,8 @@ def main():
 
     # Evaluate original model
     print("Evaluating original FP32 model...")
-    max_eval_batches = (args.max_eval_batches or
-                        config['ptq'].get('max_eval_batches'))
+    max_eval_batches = (args.max_eval_batches
+                        or config['ptq'].get('max_eval_batches'))
     original_accuracy = evaluate_model(
         model, test_loader, device, max_eval_batches)
     print(f"Original accuracy: {original_accuracy:.2f}%")

@@ -6,22 +6,22 @@ setup: ## Setup conda environment using the setup script
 	./scripts/create_env.sh
 
 test: ## Run all quantization tests
-	python test_quantization.py
+	python src/test_quantization.py
 
 ptq: ## Run multi-bitwidth PTQ (recommended)
-	python ptq_quantize.py --data_path data/ --max_eval_batches 10
+	python src/ptq_quantize.py --data_path data/ --max_eval_batches 10
 
 ptq-aimet: ## Run AIMET + Power-of-2 PTQ example (professional)
-	python aimet_power_of_2_ptq.py --data_path data/ --max_eval_batches 10
+	python src/aimet_power_of_2_ptq.py --data_path data/ --max_eval_batches 10
 
 qat: ## Run multi-bitwidth QAT with PTQ init (recommended)
-	python qat_train.py --data_path data/ --epochs 2
+	python src/qat_train.py --data_path data/ --epochs 2
 
 qat-full: ## Run full QAT training (10 epochs)
-	python qat_train.py --data_path data/ --epochs 10
+	python src/qat_train.py --data_path data/ --epochs 10
 
 qat-aimet: ## Run AIMET + Power-of-2 QAT example (2 epochs)
-	python aimet_power_of_2_qat.py --data_path data/ --epochs 2 --batch_size 128
+	python src/aimet_power_of_2_qat.py --data_path data/ --epochs 2 --batch_size 128
 
 demo: ## Run power-of-2 quantizer demonstration
 	python src/utils/power_of_2_quantizer.py

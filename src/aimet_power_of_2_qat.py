@@ -44,20 +44,12 @@ except ImportError as e:
     AIMET_AVAILABLE = False
 
 # Local imports
-try:
-    # Try relative imports first (when run as module)
-    from .utils.model_utils import (
-        create_criterion, create_model, create_optimizer, create_scheduler,
-        evaluate_model, load_config, load_data, load_model
-    )
-    from .utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
-except ImportError:
-    # Fall back to absolute imports (when run directly)
-    from utils.model_utils import (
-        create_criterion, create_model, create_optimizer, create_scheduler,
-        evaluate_model, load_config, load_data, load_model
-    )
-    from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
+from ptq_quantize import quantize_inputs_outputs
+from utils.model_utils import (
+    create_criterion, create_model, create_optimizer, create_scheduler,
+    evaluate_model, load_config, load_data, load_model
+)
+from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
 
 # Suppress PyTorch deprecation warnings
 warnings.filterwarnings("ignore", message=".*NLLLoss2d.*",
@@ -499,12 +491,6 @@ def main():
     # Add input/output quantization analysis for power-of-2 model
     print("\nAnalyzing input/output quantization for power-of-2 model...")
 
-    # Import the quantize_inputs_outputs function
-    try:
-        from .ptq_quantize import quantize_inputs_outputs
-    except ImportError:
-        from ptq_quantize import quantize_inputs_outputs
-
     # Apply input/output quantization analysis to power-of-2 model
     power_of_2_input_output_details = quantize_inputs_outputs(
         power_of_2_model, qat_manager.quantizer, test_loader, device,
@@ -535,7 +521,7 @@ def main():
     print(f"Original model accuracy:           {initial_accuracy:.2f}%")
     print(f"AIMET QAT model accuracy:          {best_accuracy:.2f}%")
     print(f"Power-of-2 constrained accuracy:   {power_of_2_accuracy:.2f}%")
-    print(f"")
+    print("")
     print(f"AIMET improvement over original:    {aimet_improvement:+.2f}%")
     print(f"Power-of-2 improvement over original: {power_of_2_improvement:+.2f}%")
     print(f"Accuracy drop from power-of-2:     {accuracy_drop_from_power_of_2:+.2f}%")
@@ -578,9 +564,11 @@ def main():
 
                     print(f"  {layer_name}:")
                     print(f"    AIMET scale:     {aimet_scale:.8f}")
-                    print(f"    Power-of-2 scale: {power_of_2_scale:.8f} = {final_constraint_info[layer_name]['power_of_2']}")
+                    power_of_2_info = final_constraint_info[layer_name]['power_of_2']
+                    hardware_op = final_constraint_info[layer_name]['hardware_op']
+                    print(f"    Power-of-2 scale: {power_of_2_scale:.8f} = {power_of_2_info}")
                     print(f"    Difference:      {difference:.2f}%")
-                    print(f"    Hardware op:     {final_constraint_info[layer_name]['hardware_op']}")
+                    print(f"    Hardware op:     {hardware_op}")
         else:
             print("⚠️  Could not extract AIMET scales for comparison")
             print("This is expected in current AIMET versions")

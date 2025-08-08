@@ -42,18 +42,11 @@ except ImportError as e:
     AIMET_AVAILABLE = False
 
 # Local imports
-try:
-    # Try relative imports first (when run as module)
-    from .utils.model_utils import (
-        create_model, evaluate_model, load_config, load_data, load_model
-    )
-    from .utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
-except ImportError:
-    # Fall back to absolute imports (when run directly)
-    from utils.model_utils import (
-        create_model, evaluate_model, load_config, load_data, load_model
-    )
-    from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
+from ptq_quantize import quantize_inputs_outputs
+from utils.model_utils import (
+    create_model, evaluate_model, load_config, load_data, load_model
+)
+from utils.power_of_2_quantizer import MultiBitwidthPowerOf2Quantizer
 
 # Suppress PyTorch deprecation warnings
 warnings.filterwarnings("ignore", message=".*NLLLoss2d.*",
@@ -258,27 +251,21 @@ def main():
     )
 
     # Debug: Print model structure to understand missing layers
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("MODEL ARCHITECTURE DEBUG")
-    print("="*60)
+    print("=" * 60)
     for name, module in model.named_modules():
         if name:  # Skip the root module
             has_weights = hasattr(module, 'weight') and module.weight is not None
             weight_shape = module.weight.shape if has_weights else "No weights"
             print(f"{name:20} | {type(module).__name__:15} | {weight_shape}")
-    print("="*60)
+    print("=" * 60)
 
     # Apply power-of-2 constraints after AIMET encoding computation
     constraint_info = power_of_2_quantizer.apply_power_of_2_constraints(model, quantsim)
 
     # Add input/output quantization analysis
     print("\nAnalyzing input/output quantization parameters...")
-
-    # Import the quantize_inputs_outputs function from ptq_quantize
-    try:
-        from .ptq_quantize import quantize_inputs_outputs
-    except ImportError:
-        from ptq_quantize import quantize_inputs_outputs
 
     # Apply input/output quantization analysis
     input_output_details = quantize_inputs_outputs(

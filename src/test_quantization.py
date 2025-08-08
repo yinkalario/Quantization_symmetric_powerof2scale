@@ -8,7 +8,6 @@ Author: Yin Cao
 """
 
 # Standard library imports
-import os
 import subprocess
 import sys
 
