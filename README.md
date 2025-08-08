@@ -3,8 +3,8 @@
 Simple, plug-and-play PyTorch quantization with:
 - **Power-of-2 scale factors** (enables bit-shift operations)
 - **Multi-bitwidth configuration** (weights, inputs, outputs, biases)
-- **PTQ → QAT workflow** (best practice quantization pipeline)
-- **Complete input/output quantization** (full pipeline coverage)
+- **Complete quantization pipeline** (PTQ and QAT implementations)
+- **Full input/output quantization** (complete tensor quantization)
 - **JSON output format** (clean, structured results)
 - **AIMET integration** (industry-standard quantization toolkit)
 - **Dual implementation** (custom + AIMET versions)
@@ -53,10 +53,7 @@ python qat_train.py --data_path data/ --epochs 5 --no-final_ptq
 
 **AIMET Implementation:**
 ```bash
-# AIMET PTQ (industry-standard)
-python aimet_power_of_2_ptq.py --data_path data/ --model_path model.pth
-
-# AIMET QAT (with power-of-2 constraints)
+# AIMET QAT (with power-of-2 analysis)
 python aimet_power_of_2_qat.py --data_path data/ --model_path model.pth --epochs 5
 
 # Skip initial PTQ for faster training
@@ -165,10 +162,11 @@ training:
 | Feature | Custom Implementation | AIMET Implementation |
 |---------|----------------------|---------------------|
 | **Ease of Use** | Simple, educational | Industry-standard |
-| **Power-of-2 Scales** | ✅ Built-in | ✅ Custom constraints |
-| **3-Step Pipeline** | ✅ PTQ→QAT→PTQ | ✅ PTQ→QAT→PTQ |
-| **Input/Output Quantization** | ✅ Full coverage | ✅ AIMET managed |
-| **Hardware Optimization** | ✅ Bit-shift operations | ✅ AIMET optimized |
+| **Power-of-2 Scales** | ✅ Built-in | ✅ Analysis & constraints |
+| **Training Pipeline** | ✅ PTQ→QAT→PTQ | ✅ Optional PTQ→QAT |
+| **Quantization Approach** | Custom power-of-2 | AIMET + power-of-2 analysis |
+| **Input/Output Quantization** | ✅ Full coverage | ✅ Full coverage |
+| **Hardware Optimization** | ✅ Bit-shift operations | ✅ Bit-shift analysis |
 | **Production Ready** | ✅ Research/Education | ✅ Industry deployment |
 | **Flexibility** | High (custom logic) | Medium (AIMET framework) |
 | **Dependencies** | PyTorch only | PyTorch + AIMET |
@@ -177,14 +175,16 @@ training:
 **When to use Custom:**
 - Learning quantization concepts
 - Research and experimentation
-- Custom quantization schemes
+- True power-of-2 training
 - Minimal dependencies
+- Complete control over quantization
 
 **When to use AIMET:**
 - Production deployment
 - Industry-standard workflows
-- Advanced quantization features
+- Comparing optimal vs power-of-2 quantization
 - Enterprise environments
+- Advanced AIMET features
 
 ## 🔧 What Makes This Special?
 
@@ -225,7 +225,7 @@ quantization:
 - **Activations**: 8-bit with careful calibration (dynamic range varies)
 - **Biases**: 32-bit to maintain accuracy (small memory overhead)
 
-### Enhanced 3-Step PTQ → QAT → PTQ Workflow
+### Custom Implementation: 3-Step PTQ → QAT → PTQ Workflow
 **Step 1: Initial PTQ (Weight/Bias Quantization)**
 - Fast quantization without retraining (minutes)
 - Quantizes weights and biases only
@@ -246,6 +246,27 @@ quantization:
 - **Complete coverage**: All tensors (weights, biases, inputs, outputs) quantized
 - **Production ready**: Full quantization details for hardware deployment
 - **JSON output**: Clean, structured results with hardware operation details
+
+### AIMET Implementation: Industry-Standard Approach
+
+**AIMET PTQ (`aimet_power_of_2_ptq.py`)**
+- Uses AIMET's quantization simulation
+- Applies power-of-2 analysis to weights and activations
+- Industry-standard calibration and encoding computation
+- Complete input/output quantization analysis
+
+**AIMET QAT (`aimet_power_of_2_qat.py`)**
+- Optional initial PTQ for analysis
+- AIMET quantization-aware training (uses optimal scales during training)
+- Power-of-2 analysis of trained model weights
+- Creates separate power-of-2 constrained model for deployment
+- Compares AIMET accuracy vs power-of-2 accuracy
+
+**Key Differences:**
+- **AIMET QAT**: Trains with optimal scales, then analyzes power-of-2 feasibility
+- **Custom QAT**: Trains directly with power-of-2 constraints
+- **AIMET**: Better accuracy during training, power-of-2 analysis for deployment
+- **Custom**: True power-of-2 training, potentially lower accuracy but hardware-optimized
 
 ## 📊 Example Output
 
@@ -305,21 +326,21 @@ Memory Access:  75% reduction with power-of-2 scales
 
 ### Multiple Approaches Available
 
-**Option A: Multi-bitwidth (Recommended)**
+**Option A: Custom Implementation (Recommended for Learning)**
 - Configurable bitwidths for different tensor types
 - Configuration-driven setup via YAML files
-- PTQ → QAT workflow for best accuracy
+- True PTQ → QAT → PTQ workflow for complete quantization
 
 **Option B: AIMET + Power-of-2 (Professional)**
 - Uses Qualcomm's AIMET quantization infrastructure
 - Production-ready with advanced calibration
-- Industry-standard + hardware optimization
+- Industry-standard quantization + power-of-2 analysis
 
 ### AIMET Version (Professional)
 For production-grade quantization:
 ```bash
-make ptq-aimet     # AIMET PTQ with power-of-2 constraints
-make qat-aimet     # AIMET QAT with power-of-2 constraints
+make ptq-aimet     # AIMET PTQ with power-of-2 analysis
+make qat-aimet     # AIMET QAT with power-of-2 analysis
 ```
 
 ### Makefile Commands
