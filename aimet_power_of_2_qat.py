@@ -487,6 +487,23 @@ def main():
                 module.weight.data = quantized_weights
                 print(f"  ✅ Applied power-of-2 quantization to {name}")
 
+    # Add input/output quantization analysis for power-of-2 model
+    print("\nAnalyzing input/output quantization for power-of-2 model...")
+
+    # Import the quantize_inputs_outputs function
+    import sys
+    sys.path.append(str(Path(__file__).parent))
+    from ptq_quantize import quantize_inputs_outputs
+
+    # Apply input/output quantization analysis to power-of-2 model
+    power_of_2_input_output_details = quantize_inputs_outputs(
+        power_of_2_model, qat_manager.quantizer, test_loader, device,
+        num_batches=config['ptq'].get('calibration_batches', 50)
+    )
+
+    # Merge with existing power-of-2 analysis
+    final_constraint_info.update(power_of_2_input_output_details)
+
     # Evaluate power-of-2 constrained model
     print("\nEvaluating power-of-2 constrained model...")
     power_of_2_accuracy = evaluate_model(power_of_2_model, test_loader, device)
@@ -511,6 +528,16 @@ def main():
     # Also analyze original model for comparison
     print("\nPower-of-2 analysis of ORIGINAL model weights (for comparison):")
     original_constraint_info = qat_manager.apply_power_of_2_constraints(quantsim, original_model)
+
+    # Add input/output analysis for original model
+    print("\nAnalyzing input/output quantization for original model...")
+    original_input_output_details = quantize_inputs_outputs(
+        original_model, qat_manager.quantizer, test_loader, device,
+        num_batches=config['ptq'].get('calibration_batches', 50)
+    )
+
+    # Merge with original model analysis
+    original_constraint_info.update(original_input_output_details)
 
     # Compare AIMET scales vs Power-of-2 scales
     print("\n" + "=" * 60)

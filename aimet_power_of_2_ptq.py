@@ -263,6 +263,23 @@ def main():
     # Apply power-of-2 constraints after AIMET encoding computation
     constraint_info = power_of_2_quantizer.apply_power_of_2_constraints(model, quantsim)
 
+    # Add input/output quantization analysis
+    print("\nAnalyzing input/output quantization parameters...")
+
+    # Import the quantize_inputs_outputs function from ptq_quantize
+    import sys
+    sys.path.append(str(Path(__file__).parent))
+    from ptq_quantize import quantize_inputs_outputs
+
+    # Apply input/output quantization analysis
+    input_output_details = quantize_inputs_outputs(
+        model, power_of_2_quantizer.quantizer, test_loader, device,
+        num_batches=config['ptq'].get('calibration_batches', 50)
+    )
+
+    # Merge quantization details
+    constraint_info.update(input_output_details)
+
     # Evaluate quantized model
     print("\nEvaluating AIMET + Power-of-2 quantized model...")
     quantized_accuracy = evaluate_model(quantsim.model, test_loader, device, max_eval_batches)

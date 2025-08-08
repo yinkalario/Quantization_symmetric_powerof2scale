@@ -251,6 +251,16 @@ def main():
 
     quantization_details = quantize_model_comprehensive(model, quantizer)
 
+    # Apply input/output quantization
+    print("\nApplying input/output quantization...")
+    input_output_details = quantize_inputs_outputs(
+        model, quantizer, test_loader, device,
+        num_batches=config['ptq'].get('calibration_batches', 50)
+    )
+
+    # Merge quantization details
+    quantization_details.update(input_output_details)
+
     # Evaluate quantized model
     print("\nEvaluating quantized model...")
     quantized_accuracy = evaluate_model(
